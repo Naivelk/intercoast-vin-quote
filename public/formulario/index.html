@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cotiza tu póliza</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <form id="formulario">
+      <div class="form-header">
+        <h2>🚗 Cotiza tu póliza de auto <span class="shield">🛡️</span></h2>
+        <p>Recibe un estimado inmediato basado en tu información</p>
+      </div>
+
+      <label for="cantidadVehiculos">🚘 ¿Cuántos vehículos deseas cotizar?</label>
+      <select id="cantidadVehiculos" name="cantidadVehiculos" required>
+        <option value="">Selecciona una opción</option>
+        <option value="1">1 vehículo</option>
+        <option value="2">2 vehículos</option>
+        <option value="3">3 vehículos</option>
+        <option value="4">4 vehículos</option>
+        <option value="5">5 vehículos</option>
+      </select>
+
+      <div id="vinContainer"></div>
+
+      <label for="nombre">🧾 Nombre completo (como en su licencia o ID):</label>
+      <input type="text" id="nombre" name="nombre" placeholder="Nombre completo" required />
+
+      <label for="nacimiento">🎂 Fecha de nacimiento (MM/DD/AAAA):</label>
+      <input type="date" id="nacimiento" name="nacimiento" required />
+
+      <label for="correo">📧 Correo electrónico:</label>
+      <input type="email" id="correo" name="correo" placeholder="correo@ejemplo.com" required />
+
+      <label for="telefono">📱 Teléfono:</label>
+      <input type="tel" id="telefono" name="telefono" placeholder="(123) 456-7890" required />
+
+      <label for="documento">🆔 Número de licencia o ID:</label>
+      <input type="text" id="documento" name="documento" placeholder="123456789" required />
+
+      <label for="direccion">🏠 Dirección:</label>
+      <input type="text" id="direccion" name="direccion" placeholder="Dirección completa" required />
+
+      <button type="submit" id="btnCotizar">Hacer Estimado</button>
+      <p class="nota-importante">🛈 Esto es un estimado aproximado. El precio real depende de la veracidad de la información.</p>
+
+      <div id="resultado"></div>
+    </form>
+  </div>
+
+  <script>
+    /* ========= Utilidades de decodificación ========= */
+    function mapResultsToDict(results) {
+      const dict = {};
+      (results || []).forEach(r => {
+        if (r.Variable && r.Value != null && r.Value !== "") dict[r.Variable] = r.Value;
+      });
+      return dict;
+    }
+
+    async function decodeVIN2Steps(vin) {
+      // 1) Descubrir año
+      const r1 = await fetch(
+        `https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/${encodeURIComponent(vin)}?format=json`
+      ).then(res => res.json());
+      const dict1 = mapResultsToDict(r1.Results || []);
+      const year = dict1["Model Year"];
+
+      // 2) Más campos en formato fila, usando modelyear para mejorar aciertos
+      const url2 =
+        `https://vpic.nhtsa.dot.gov/api/vehicles/decodevinvaluesextended/${encodeURIComponent(vin)}?format=json` +
+        (year ? `&modelyear=${year}` : "");
+      const r2 = await fetch(url2).then(res => res.json());
+      const row = (r2.Results && r2.Results[0]) ? r2.Results[0] : {};
+
+      return {
+        year: row.ModelYear || dict1["Model Year"] || "",
+        make: row.Make || dict1.Make || "",
+        model: row.Model || dict1.Model || "",
+        bodyClass: row.BodyClass || dict1["Body Class"] || "",
+        vehicleType: row.VehicleType || "",
+        fuelType: row.FuelTypePrimary || row["Fuel Type - Primary"] || "",
+        engineHP: row.EngineHP || dict1["Engine HP"] || "",
+        engineCylinders: row.EngineCylinders || "",
+        displacementL: row.DisplacementL || "",
+        driveType: row.DriveType || dict1["Drive Type"] || "",
+        transmissionStyle: row.TransmissionStyle || "",
+        transmissionSpeeds: row.TransmissionSpeeds || "",
+        doors: row.Doors || "",
+        seats: row.Seats || "",
+        gvwr: row.GVWR || "",
+        series: row.Series || "",
+        trim: row.Trim || "",
+        plantCountry: row.PlantCountry || "",
+        plantCity: row.PlantCity || ""
+      };
+    }
+
+    function fmt(x) { return (x && x !== "0") ? x : "N/D"; }
+    function round5(x) { return Math.round(x / 5) * 5; }
+
+    /* ========= Motor de precios ========= */
+    const rateConfig = {
+      baseByBodyClass: {
+        "Sedan/Saloon": 210,
+        "Hatchback": 185,
+        "Wagon": 185,
+        "Coupe": 240,
+        "Convertible": 260,
+        "Sport Utility Vehicle (SUV)": 195,
+        "Crossover": 190,
+        "Pickup": 215,
+        "Van": 200,
+        "Minivan": 160,
+        "Truck": 215,
+        "Other": 200
+      },
+      modelOverrides: [
+        { make: "tesla", modelIncludes: ["model 3"], base: 295 },
+        { make: "tesla", modelIncludes: ["model y"], base: 288 },
+        { make: "toyota", modelIncludes: ["camry"], base: 157 },
+        { make: "toyota", modelIncludes: ["rav4"], base: 173 },
+        { make: "honda",  modelIncludes: ["cr-v","crv"], base: 158 },
+        { make: "nissan", modelIncludes: ["rogue"], base: 180 },
+        { make: "ford",   modelIncludes: ["f-150","f150","f-series","f series"], base: 172 },
+        { make: "chevrolet", modelIncludes: ["silverado"], base: 226 }
+      ],
+      adjusters: {
+        year: (y) => {
+          const n = parseInt(y, 10);
+          if (!n) return 1.0;
+          if (n >= 2022) return 0.92;
+          if (n >= 2016) return 1.00;
+          if (n >= 2010) return 1.05;
+          return 1.12;
+        },
+        fuel: (f) => {
+          const x = (f || "").toLowerCase();
+          if (x.includes("electric")) return 1.08;
+          if (x.includes("hybrid") || x.includes("plug-in")) return 1.03;
+          if (x.includes("diesel")) return 1.02;
+          return 1.0;
+        },
+        engineHp: (hp) => {
+          const n = parseInt(hp, 10);
+          if (!n) return 1.0;
+          if (n >= 400) return 1.20;
+          if (n >= 300) return 1.10;
+          return 1.0;
+        },
+        driveType: (d) => {
+          const t = (d || "").toLowerCase();
+          if (t.includes("awd") || t.includes("4wd") || t.includes("4x4") || t.includes("all")) return 1.03;
+          return 1.0;
+        },
+        modelHint: (m) => {
+          const md = (m || "").toLowerCase();
+          if (md.includes("van") || md.includes("express")) return 1.10;
+          if (md.includes("suv")) return 0.98;
+          if (md.includes("sport") || md.includes("amg") || md.includes("sti") || md.includes("hellcat")) return 1.15;
+          return 1.0;
+        }
+      },
+      nationalFallback: 203
+    };
+
+    function calcularEdadCliente(fechaNacimiento) {
+      if (!fechaNacimiento) return 35; // Edad por defecto si no se proporciona
+      const nacimiento = new Date(fechaNacimiento);
+      const hoy = new Date();
+      let edad = hoy.getFullYear() - nacimiento.getFullYear();
+      const m = hoy.getMonth() - nacimiento.getMonth();
+      
+      if (m < 0 || (m === 0 && hoy.getDate() < nacimiento.getDate())) {
+        edad--;
+      }
+      return edad;
+    }
+
+    function calcularEstimadoVehiculo(v, fechaNacimiento) {
+      const edadCliente = calcularEdadCliente(fechaNacimiento);
+      const base = 80; // base para liability
+      let estimado = base;
+
+      // Marca
+      const marca = (v.make || "").toUpperCase();
+      const marcasEconomicas = ["TOYOTA", "HONDA", "NISSAN", "KIA", "HYUNDAI", "CHEVROLET", "FORD", "VOLKSWAGEN"];
+      const marcasPremium = ["BMW", "MERCEDES-BENZ", "LEXUS", "ACURA", "INFINITI", "AUDI", "TESLA"];
+      const marcasCostosas = ["JAGUAR", "PORSCHE", "LAND ROVER"];
+
+      if (marcasEconomicas.includes(marca)) estimado -= 5;
+      else if (marcasPremium.includes(marca)) estimado += 10;
+      else if (marcasCostosas.includes(marca)) estimado += 20;
+
+      // Modelo de alto riesgo
+      const modelo = (v.model || "").toUpperCase();
+      const modelosDeportivos = ["MUSTANG", "CAMARO", "CHALLENGER", "CHARGER", "CORVETTE"];
+      if (modelosDeportivos.some(m => modelo.includes(m))) estimado += 15;
+
+      // Año del vehículo
+      const anio = parseInt(v.year);
+      if (!isNaN(anio)) {
+        const edadVehiculo = new Date().getFullYear() - anio;
+        if (edadVehiculo <= 3) estimado += 10;
+        else if (edadVehiculo >= 15) estimado += 5;
+      }
+
+      // Tipo de carrocería
+      const tipo = (v.bodyClass || "").toUpperCase();
+      if (tipo.includes("SUV")) estimado += 8;
+      else if (tipo.includes("TRUCK") || tipo.includes("PICKUP") || tipo.includes("VAN")) estimado += 12;
+      else if (tipo.includes("COUPE")) estimado += 10;
+
+      // Edad del cliente (ajuste realista)
+      if (edadCliente < 25) estimado += 20;
+      else if (edadCliente > 65) estimado += 10;
+
+      // Mínimo estimado
+      if (estimado < 55) estimado = 55;
+
+      return parseFloat(estimado.toFixed(2));
+    }
+
+    function pickBaseByBodyClass(bodyClass) {
+      if (!bodyClass) return null;
+      for (const key of Object.keys(rateConfig.baseByBodyClass)) {
+        if (bodyClass.toLowerCase().includes(key.toLowerCase())) {
+          return rateConfig.baseByBodyClass[key];
+        }
+      }
+      return null;
+    }
+
+    function pickModelOverride(make, model) {
+      const mk = (make || "").toLowerCase();
+      const md = (model || "").toLowerCase();
+      for (const o of rateConfig.modelOverrides) {
+        if (mk === o.make && o.modelIncludes.some(s => md.includes(s))) {
+          return o.base;
+        }
+      }
+      return null;
+    }
+
+    /* ========= Submit ========= */
+    function isValidVIN(vin) {
+      vin = (vin || "").toUpperCase().trim();
+      return /^[A-HJ-NPR-Z0-9]{17}$/.test(vin); // 17 caracteres válidos (sin I,O,Q)
+    }
+
+    // Función para validar formato de VIN
+    function isValidVINFormat(vin) {
+      if (typeof vin !== 'string') return false;
+      vin = vin.trim().toUpperCase();
+      return /^[A-HJ-NPR-Z0-9]{17}$/.test(vin);
+    }
+
+    // Generar campos VIN dinámicamente
+    document.getElementById("cantidadVehiculos").addEventListener("change", function() {
+      const container = document.getElementById("vinContainer");
+      container.innerHTML = "";
+
+      const cantidad = parseInt(this.value, 10);
+      if (!cantidad || cantidad < 1 || cantidad > 5) return;
+
+      for (let i = 0; i < cantidad; i++) {
+        const div = document.createElement("div");
+        div.className = "vin-group";
+        
+        const label = document.createElement("label");
+        label.setAttribute("for", `vin${i}`);
+        label.textContent = `🔑 VIN del vehículo ${i + 1}:`;
+        
+        const input = document.createElement("input");
+        input.type = "text";
+        input.id = `vin${i}`;
+        input.name = `vin${i}`;
+        input.placeholder = "Ej: 5YJ3E1EB4MF096480";
+        input.required = true;
+        
+        div.appendChild(label);
+        div.appendChild(input);
+        container.appendChild(div);
+      }
+    });
+
+    document.getElementById("formulario").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const out = document.getElementById("resultado");
+      const btn = document.getElementById("btnCotizar");
+      
+      // Obtener y validar cantidad de vehículos
+      const cantidadSelect = document.getElementById("cantidadVehiculos");
+      const cantidad = parseInt(cantidadSelect.value, 10);
+      
+      if (isNaN(cantidad) || cantidad < 1 || cantidad > 5) {
+        out.innerHTML = '<div class="error-message">❌ Por favor selecciona una cantidad válida de vehículos (1-5).</div>';
+        cantidadSelect.focus();
+        return false;
+      }
+
+      // Obtener VINs y validar
+      const vins = [];
+      for (let i = 0; i < cantidad; i++) {
+        const vin = document.getElementById(`vin${i}`).value.trim();
+        if (!isValidVINFormat(vin)) {
+          out.innerHTML = `<div class="error-message">❌ El VIN del vehículo ${i + 1} no es válido. Debe tener 17 caracteres y no contener I, O o Q.</div>`;
+          return;
+        }
+        vins.push(vin);
+      }
+
+      // Obtener datos del formulario
+      const email = document.getElementById("correo").value.trim();
+      const phone = document.getElementById("telefono").value.trim();
+      const nombre = document.getElementById("nombre").value.trim();
+      const nacimiento = document.getElementById("nacimiento").value;
+      const documento = document.getElementById("documento").value.trim();
+      const direccion = document.getElementById("direccion").value.trim();
+
+      // Bloquear botón mientras procesa
+      btn.disabled = true;
+      const oldText = btn.textContent;
+      btn.textContent = "Procesando…";
+      out.innerHTML = `🔎 Consultando información de ${cantidad} vehículo${cantidad > 1 ? 's' : ''}...`;
+
+      try {
+        const vehiculos = [];
+        let estimadoTotal = 0;
+        const estimadosIndividuales = [];
+        
+        // Procesar cada VIN
+        for (let i = 0; i < vins.length; i++) {
+          const vin = vins[i];
+          out.innerHTML = `🔍 Procesando vehículo ${i + 1} de ${cantidad}...`;
+          
+          let v;
+          try {
+            v = await decodeVIN2Steps(vin);
+          } catch (err) {
+            console.error("Error al consultar VIN", vin, err);
+            out.innerHTML = `❌ Error consultando el VIN del vehículo ${i + 1}. Revisa si es válido o intenta de nuevo.`;
+            return;
+          }
+
+          if (!v.year || !v.make || !v.model) {
+            out.innerHTML = `❌ No se pudo decodificar el VIN del vehículo ${i + 1} correctamente. Verifica que el número sea válido.`;
+            return;
+          }
+
+          // Calcular estimado individual usando la nueva fórmula
+          const estimado = calcularEstimadoVehiculo(v, nacimiento);
+          estimadoTotal += estimado;
+          estimadosIndividuales.push(estimado);
+
+          vehiculos.push({
+            vin,
+            year: v.year,
+            make: v.make,
+            model: v.model,
+            bodyClass: v.bodyClass,
+            vehicleType: v.vehicleType,
+            fuelType: v.fuelType,
+            engineHP: v.engineHP,
+            estimado
+          });
+        }
+        
+        // Aplicar descuento por cantidad de vehículos
+        let descuento = 0;
+        if (cantidad === 2) descuento = 0.20;
+        else if (cantidad === 3) descuento = 0.25;
+        else if (cantidad === 4) descuento = 0.10;
+        else if (cantidad === 5) descuento = 0.15;
+        
+        // Calcular total con descuento (sin redondear a múltiplos de 5)
+        const totalConDescuento = Math.round((estimadoTotal * (1 - descuento)) * 100) / 100;
+
+        // Mostrar resumen con detalles de vehículos y precio total
+        out.innerHTML = `
+          <div class="resultado-box">
+            <h3>✅ Cotización de ${cantidad} vehículo${cantidad > 1 ? 's' : ''} lista</h3>
+            
+            <div style="background: #e8f5e9; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #4CAF50;">
+              <p style="margin: 0; font-size: 1.1em;">
+                <strong>¡Descuento aplicado!</strong> Por hacer su cotización online con INTERCOAST INSURANCE.
+              </p>
+            </div>
+            
+            <div style="margin: 20px 0;">
+              <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                <p style="margin: 0 0 10px 0; font-size: 1.1em;">
+                  <strong>Total estimado mensual:</strong>
+                </p>
+                <p style="font-size: 1.5em; color: #1976D2; margin: 0; font-weight: bold;">
+                  $${totalConDescuento.toFixed(2)}/mes
+                </p>
+              </div>
+              
+              <p style="font-size: 1.1em; margin: 15px 0 5px 0;">
+                <strong>Vehículo${vehiculos.length > 1 ? 's' : ''} incluido${vehiculos.length > 1 ? 's' : ''}:</strong>
+              </p>
+              
+              ${vehiculos.map((v, i) => `
+                <div style="margin: 10px 0; padding: 12px; background: #fff; border: 1px solid #e0e0e0; border-radius: 6px;">
+                  <p style="margin: 0 0 8px 0; font-weight: bold; color: #333;">
+                    🚗 ${v.year || ''} ${v.make || ''} ${v.model || ''}
+                  </p>
+                  <div style="font-size: 0.9em; color: #555;">
+                    <div style="margin-bottom: 4px;"><strong>VIN:</strong> ${v.vin}</div>
+                    <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                      ${v.bodyClass ? `<div><strong>Tipo:</strong> ${v.bodyClass}</div>` : ''}
+                      ${v.fuelType ? `<div><strong>Combustible:</strong> ${v.fuelType}</div>` : ''}
+                    </div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+            
+            <div style="background: #fff3e0; padding: 15px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #FFA000;">
+              <p style="margin: 0; font-weight: bold; color: #E65100;">
+                🎉 ¡Presentando esta cotización tienes un 15% de descuento en tu primer mes!
+              </p>
+            </div>
+            
+            <div style="margin-top: 15px;">
+              <p style="font-size: 0.9em; color: #666; line-height: 1.5; margin: 0;">
+                <em>Este es un precio estimado. El precio real varía según la cobertura y el número de conductores que quieras agregar a tu póliza.</em>
+              </p>
+              <p style="margin: 15px 0 0 0; font-weight: 500;">
+                Un asesor especializado se pondrá en contacto contigo a la brevedad con los detalles completos.
+              </p>
+            </div>
+          </div>
+        `;
+
+        // Scroll suave al resultado
+        out.scrollIntoView({ behavior: "smooth", block: "start" });
+
+        // Función para obtener parámetros de URL y referrer
+        function getQueryParams() {
+          const params = new URLSearchParams(window.location.search);
+          return {
+            utm_source: params.get("utm_source") || "",
+            utm_medium: params.get("utm_medium") || "",
+            utm_campaign: params.get("utm_campaign") || "",
+            utm_term: params.get("utm_term") || "",
+            utm_content: params.get("utm_content") || "",
+            gclid: params.get("gclid") || "",
+            referrer: document.referrer || ""
+          };
+        }
+
+        // 4) Guardar en Google Sheets (FormData + no-cors)
+        const payload = {
+          // Información personal
+          nombre,
+          nacimiento,
+          documento,
+          direccion,
+          email,
+          telefono: phone,
+          
+          // Lista de vehículos con la estructura exacta requerida
+          vehiculos: vehiculos.map(v => ({
+            vin: v.vin,
+            year: v.year || '',
+            make: v.make || '',
+            model: v.model || '',
+            bodyClass: v.bodyClass || '',
+            estimated: v.estimado || 0
+          })),
+          
+          // Total de la cotización (con descuento aplicado)
+          totalEstimado: totalConDescuento,
+          timestamp: new Date().toISOString(),
+          
+          // Parámetros de seguimiento (UTM/GCLID)
+          ...getQueryParams()
+        };
+
+        const fd = new FormData();
+        
+        // Agregar campos del formulario
+        fd.append("nombre", nombre);
+        fd.append("nacimiento", nacimiento);
+        fd.append("documento", documento);
+        fd.append("direccion", direccion);
+        fd.append("email", email);
+        fd.append("telefono", phone);
+        
+        // Asegurar que cantidadVehiculos sea un número válido
+        const cantidadVehiculos = Math.min(Math.max(1, cantidad), 5); // Forzar entre 1 y 5
+        fd.append("cantidadVehiculos", String(cantidadVehiculos));
+        
+        // Agregar total estimado con descuento aplicado
+        fd.append("totalEstimado", String(totalConDescuento));
+        
+        // Agregar cada vehículo como vehiculo0, vehiculo1, etc.
+        vehiculos.forEach((v, idx) => {
+          fd.append(`vehiculo${idx}`, JSON.stringify({
+            vin: v.vin,
+            year: v.year || '',
+            make: v.make || '',
+            model: v.model || '',
+            bodyClass: v.bodyClass || '',
+            estimated: v.estimado || 0
+          }));
+        });
+        
+        // Agregar parámetros UTM/GCLID
+        const params = getQueryParams();
+        Object.entries(params).forEach(([k, v]) => fd.append(k, v || ""));
+        
+        // Agregar timestamp
+        fd.append("timestamp", new Date().toISOString());
+
+        fetch("https://script.google.com/macros/s/AKfycbwc9Wg3fubgmvIMlXPPoJVcgiQ96cQwVU_vIIM1Qr1oIPpO0OkrG-DBCRaVcGjgXiGA/exec", {
+          method: "POST",
+          mode: "no-cors",
+          body: fd
+        }).catch(console.error);
+
+        // Confirmación visual de guardado
+        const confirm = document.createElement("div");
+        confirm.style.marginTop = "12px";
+        confirm.style.fontSize = "14px";
+        confirm.textContent = "✔️ Cotización guardada. Un asesor te contactará pronto.";
+        out.appendChild(confirm);
+
+      } catch (err) {
+        console.error(err);
+        out.innerHTML = "❌ Error al consultar el VIN. Intenta de nuevo.";
+      } finally {
+        // Restaurar botón
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.textContent = oldText;
+        }, 800);
+      }
+    });
+  </script>
+</body>
+</html>
