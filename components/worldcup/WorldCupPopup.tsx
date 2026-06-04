@@ -93,14 +93,18 @@ export default function WorldCupPopup() {
               </button>
 
               {/* Contenido */}
-              <div className="relative z-10 px-6 pt-10 pb-6 text-center">
+              <div className="relative z-10 px-6 pt-8 pb-6 text-center">
                 {/* Balón animado */}
                 <motion.div
-                  className="text-6xl mb-3 inline-block"
-                  animate={{ rotate: [0, 15, -15, 0], y: [0, -6, 0] }}
-                  transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                  className="mb-3 inline-block"
+                  animate={{ rotate: [0, 360] }}
+                  transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
                 >
-                  ⚽
+                  <img
+                    src="https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Soccer_Ball.svg/120px-Soccer_Ball.svg.png"
+                    alt="Balón de fútbol"
+                    className="w-16 h-16 drop-shadow-2xl"
+                  />
                 </motion.div>
 
                 <div className="inline-flex items-center gap-1.5 bg-yellow-400 text-gray-900 text-xs font-extrabold px-3 py-1 rounded-full mb-3">
@@ -116,19 +120,41 @@ export default function WorldCupPopup() {
                   Esta temporada es especial. Cotiza tu seguro de auto hoy con Intercoast y maneja tranquilo mientras disfrutas el Mundial. 🎉
                 </p>
 
-                {/* Países emoji */}
-                <div className="mt-4 flex justify-center gap-1.5 flex-wrap">
-                  {['🇦🇷','🇧🇷','🇲🇽','🇺🇸','🇨🇴','🇺🇾','🇨🇱','🇵🇪','🇪🇨','🇵🇾'].map((f, i) => (
-                    <motion.span
-                      key={i}
-                      className="text-2xl"
-                      initial={{ opacity: 0, scale: 0 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: 0.4 + i * 0.05, type: 'spring' }}
-                    >
-                      {f}
-                    </motion.span>
-                  ))}
+                {/* Banderas reales */}
+                <div className="mt-4">
+                  <p className="text-xs text-white/40 uppercase tracking-widest mb-2">Países participantes</p>
+                  <div className="flex justify-center gap-2 flex-wrap">
+                    {[
+                      { code: 'us', name: 'USA' },
+                      { code: 'mx', name: 'México' },
+                      { code: 'ar', name: 'Argentina' },
+                      { code: 'br', name: 'Brasil' },
+                      { code: 'co', name: 'Colombia' },
+                      { code: 'uy', name: 'Uruguay' },
+                      { code: 'cl', name: 'Chile' },
+                      { code: 'pe', name: 'Perú' },
+                      { code: 'ec', name: 'Ecuador' },
+                      { code: 'ca', name: 'Canadá' },
+                    ].map((c, i) => (
+                      <motion.div
+                        key={i}
+                        className="flex flex-col items-center gap-1"
+                        initial={{ opacity: 0, y: 10, scale: 0.8 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ delay: 0.3 + i * 0.06, type: 'spring', stiffness: 200 }}
+                      >
+                        <div className="w-9 h-6 rounded overflow-hidden shadow-lg border border-white/20 ring-1 ring-black/20">
+                          <img
+                            src={`https://flagcdn.com/w40/${c.code}.png`}
+                            srcSet={`https://flagcdn.com/w80/${c.code}.png 2x`}
+                            alt={c.name}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <span className="text-[9px] text-white/50 font-medium">{c.name}</span>
+                      </motion.div>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Botones */}
