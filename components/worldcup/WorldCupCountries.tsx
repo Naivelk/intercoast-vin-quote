@@ -1,116 +1,67 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 
-// Todos los países participantes World Cup 2026 (48 equipos)
-// Usando flagcdn.com — imágenes reales de banderas
+// Comunidades hispanohablantes y de habla inglesa que atendemos en California
 const countries = [
-  // CONCACAF (hosts + clasificados)
-  { code: 'us', name: 'USA' },
-  { code: 'ca', name: 'Canadá' },
+  { code: 'co', name: 'Colombia' },
+  { code: 'pe', name: 'Perú' },
+  { code: 'ec', name: 'Ecuador' },
+  { code: 'ar', name: 'Argentina' },
   { code: 'mx', name: 'México' },
   { code: 'hn', name: 'Honduras' },
-  { code: 'cr', name: 'Costa Rica' },
-  { code: 'pa', name: 'Panamá' },
-  { code: 'jm', name: 'Jamaica' },
-  { code: 'cu', name: 'Cuba' },
-  // CONMEBOL
-  { code: 'ar', name: 'Argentina' },
-  { code: 'br', name: 'Brasil' },
-  { code: 'co', name: 'Colombia' },
-  { code: 'uy', name: 'Uruguay' },
-  { code: 'ec', name: 'Ecuador' },
-  { code: 'pe', name: 'Perú' },
-  { code: 'cl', name: 'Chile' },
-  { code: 'py', name: 'Paraguay' },
-  { code: 've', name: 'Venezuela' },
-  { code: 'bo', name: 'Bolivia' },
-  // UEFA
-  { code: 'es', name: 'España' },
-  { code: 'de', name: 'Alemania' },
-  { code: 'fr', name: 'Francia' },
-  { code: 'pt', name: 'Portugal' },
-  { code: 'gb-eng', name: 'Inglaterra' },
-  { code: 'nl', name: 'Holanda' },
-  { code: 'it', name: 'Italia' },
-  { code: 'be', name: 'Bélgica' },
-  { code: 'hr', name: 'Croacia' },
-  { code: 'rs', name: 'Serbia' },
-  { code: 'ch', name: 'Suiza' },
-  { code: 'dk', name: 'Dinamarca' },
-  { code: 'at', name: 'Austria' },
-  { code: 'tr', name: 'Turquía' },
-  { code: 'hu', name: 'Hungría' },
-  { code: 'sk', name: 'Eslovaquia' },
-  // CAF (África)
-  { code: 'ma', name: 'Marruecos' },
-  { code: 'sn', name: 'Senegal' },
-  { code: 'ng', name: 'Nigeria' },
-  { code: 'cm', name: 'Camerún' },
-  { code: 'eg', name: 'Egipto' },
-  { code: 'za', name: 'S. África' },
-  { code: 'ci', name: "Costa Marfil" },
-  { code: 'gh', name: 'Ghana' },
-  { code: 'tn', name: 'Túnez' },
-  // AFC (Asia)
-  { code: 'jp', name: 'Japón' },
-  { code: 'kr', name: 'Corea' },
-  { code: 'au', name: 'Australia' },
-  { code: 'ir', name: 'Irán' },
-  { code: 'sa', name: 'Arabia S.' },
+  { code: 'sv', name: 'El Salvador' },
+  { code: 'ni', name: 'Nicaragua' },
+  { code: 'us', name: 'Estados Unidos' },
 ];
 
 // Duplicamos para scroll infinito
-const doubled = [...countries, ...countries];
+const doubled = [...countries, ...countries, ...countries];
 
-export default function WorldCupCountries() {
+export default function CountriesStrip() {
   return (
-    <div className="relative overflow-hidden py-5"
+    <div
+      className="relative overflow-hidden py-5"
       style={{
-        /* Franjas de césped estilo estadio — mowing pattern */
-        background: `
-          repeating-linear-gradient(
-            90deg,
-            rgba(0,0,0,0.08) 0px, rgba(0,0,0,0.08) 48px,
-            transparent       48px, transparent       96px
-          ),
-          linear-gradient(180deg, #1a6b1a 0%, #1f7d1f 40%, #1a6b1a 100%)
-        `,
+        background: 'linear-gradient(180deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)',
+        borderTop: '1px solid rgba(255,255,255,0.06)',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
       }}
     >
-      {/* Línea blanca superior (marcación de campo) */}
-      <div className="absolute top-0 left-0 right-0 h-[3px] bg-white/20" />
-      {/* Línea blanca inferior */}
-      <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-white/20" />
-
-      {/* Brillo cenital sutil (luz del estadio desde arriba) */}
-      <div aria-hidden className="absolute inset-0 pointer-events-none"
-        style={{ background: 'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255,255,255,0.07) 0%, transparent 70%)' }}
+      {/* Brillo sutil */}
+      <div
+        aria-hidden
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: 'radial-gradient(ellipse 60% 80% at 50% 50%, rgba(56,189,248,0.04) 0%, transparent 70%)',
+        }}
       />
 
-      <p className="relative z-10 text-center text-xs font-extrabold tracking-widest text-white/90 uppercase mb-4 drop-shadow">
-        ⚽ Países participantes World Cup 2026 ⚽
+      <p className="relative z-10 text-center text-[11px] font-bold tracking-[0.2em] text-slate-400 uppercase mb-4">
+        Comunidades que atendemos
       </p>
 
       <div className="relative">
-        {/* Fades laterales en verde césped */}
-        <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-20 z-10"
-          style={{ background: 'linear-gradient(to right, #1a6b1a, transparent)' }}
+        {/* Fades laterales */}
+        <div
+          className="pointer-events-none absolute left-0 top-0 bottom-0 w-20 z-10"
+          style={{ background: 'linear-gradient(to right, #0f172a, transparent)' }}
         />
-        <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-20 z-10"
-          style={{ background: 'linear-gradient(to left, #1a6b1a, transparent)' }}
+        <div
+          className="pointer-events-none absolute right-0 top-0 bottom-0 w-20 z-10"
+          style={{ background: 'linear-gradient(to left, #0f172a, transparent)' }}
         />
 
         <motion.div
-          className="flex gap-5 w-max"
-          animate={{ x: ['0%', '-50%'] }}
-          transition={{ duration: 45, repeat: Infinity, ease: 'linear' }}
+          className="flex gap-6 w-max"
+          animate={{ x: ['0%', '-33.33%'] }}
+          transition={{ duration: 30, repeat: Infinity, ease: 'linear' }}
         >
           {doubled.map((c, i) => (
             <div
               key={i}
-              className="flex flex-col items-center gap-1.5 min-w-[60px]"
+              className="flex flex-col items-center gap-2 min-w-[72px]"
             >
-              <div className="w-11 h-8 rounded-md overflow-hidden shadow-lg border border-white/25 flex-shrink-0 ring-1 ring-black/20">
+              <div className="w-12 h-8 rounded-lg overflow-hidden shadow-lg border border-white/15 flex-shrink-0">
                 <img
                   src={`https://flagcdn.com/w40/${c.code}.png`}
                   srcSet={`https://flagcdn.com/w80/${c.code}.png 2x`}
@@ -122,7 +73,7 @@ export default function WorldCupCountries() {
                   }}
                 />
               </div>
-              <span className="text-[10px] text-slate-300 font-medium whitespace-nowrap">
+              <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
                 {c.name}
               </span>
             </div>

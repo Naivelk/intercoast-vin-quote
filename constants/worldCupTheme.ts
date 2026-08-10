@@ -7,7 +7,7 @@
  * Eso es todo. No hay que tocar ningún otro archivo.
  * ─────────────────────────────────────────────────────────────
  */
-export const WORLD_CUP_SEASON = true;
+export const WORLD_CUP_SEASON = false;
 
 export const WORLD_CUP_CONFIG = {
   /** Texto del banner superior */

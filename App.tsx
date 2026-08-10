@@ -11,11 +11,7 @@ import EvaSoundHub from './components/eva/EvaSoundHub';
 import EvaBubbleButton from './components/eva/EvaBubbleButton';
 import EvaMascotCTA from './components/EvaMascotCTA';
 import BrandStrip from './components/eva/BrandStrip';
-import { WORLD_CUP_SEASON } from './constants/worldCupTheme';
-import WorldCupBanner from './components/worldcup/WorldCupBanner';
-import WorldCupCountries from './components/worldcup/WorldCupCountries';
-import WorldCupPromo from './components/worldcup/WorldCupPromo';
-import WorldCupPopup from './components/worldcup/WorldCupPopup';
+import CountriesStrip from './components/worldcup/WorldCupCountries';
 
 // Carga diferida de componentes pesados
 const TrustBadges = lazy(() => import('./components/TrustBadges'));
@@ -32,28 +28,10 @@ const App: React.FC = () => {
   return (
     <div
       className="min-h-screen flex flex-col"
-      style={WORLD_CUP_SEASON ? {
-        background: 'linear-gradient(160deg, #080e1a 0%, #0d1628 30%, #0a1a2e 60%, #080e1a 100%)',
-        backgroundAttachment: 'fixed',
-      } : {
-        background: '#F8F9FA',
-      }}
+      style={{ background: '#F8F9FA' }}
     >
-      {/* Patrón de grama en toda la página (solo mundial) */}
-      {WORLD_CUP_SEASON && (
-        <div
-          aria-hidden
-          className="pointer-events-none fixed inset-0 z-0 opacity-[0.025]"
-          style={{
-            backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 80px, rgba(255,255,255,0.015) 80px, rgba(255,255,255,0.015) 82px)',
-            backgroundAttachment: 'fixed',
-          }}
-        />
-      )}
-
       <div className="relative z-10 flex flex-col min-h-screen">
         <EvaSoundHub />
-        {WORLD_CUP_SEASON && <WorldCupBanner />}
         <Header />
 
         <main className="flex-grow">
@@ -61,29 +39,20 @@ const App: React.FC = () => {
             <Hero />
 
             <Suspense fallback={<Loader />}>
-              {/* Franja de países mundialistas */}
-              {WORLD_CUP_SEASON && <WorldCupCountries />}
+              {/* Franja de comunidades que atendemos */}
+              <CountriesStrip />
 
               <TrustBadges />
               <EvaMascotCTA />
 
-              {/* Promo mundialista */}
-              {WORLD_CUP_SEASON && <WorldCupPromo />}
-
               <QuoteForm />
-              {WORLD_CUP_SEASON
-                ? <div className="mx-auto max-w-5xl px-6"><div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" /></div>
-                : <WaveSeparator direction="down" fillColor="#F8F9FA" height="80px" />}
+              <WaveSeparator direction="down" fillColor="#F8F9FA" height="80px" />
               <Benefits />
               <BrandStrip />
-              {WORLD_CUP_SEASON
-                ? <div className="mx-auto max-w-5xl px-6"><div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" /></div>
-                : <WaveSeparator direction="down" fillColor="#212529" height="100px" />}
+              <WaveSeparator direction="down" fillColor="#212529" height="100px" />
               <TrustSection />
               <InsurancePolicies />
-              {WORLD_CUP_SEASON
-                ? <div className="mx-auto max-w-5xl px-6"><div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" /></div>
-                : <WaveSeparator direction="down" fillColor="#F8F9FA" height="80px" />}
+              <WaveSeparator direction="down" fillColor="#F8F9FA" height="80px" />
               <Testimonials />
               <Contact />
             </Suspense>
@@ -100,9 +69,6 @@ const App: React.FC = () => {
           <Chatbot embedded />
         </EvaPhoneDock>
         <EvaBubbleButton />
-
-        {/* Popup mundialista (aparece una vez por sesión) */}
-        {WORLD_CUP_SEASON && <WorldCupPopup />}
       </div>
 
       {/* Google Analytics */}
