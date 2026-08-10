@@ -93,7 +93,7 @@ const Testimonials: React.FC = () => {
         {/* CTA Google Reviews */}
         <div className="text-center mt-12">
           <a
-            href="https://g.page/r/review"
+            href="https://share.google/FZHguWMYADFgsPE1M"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 bg-white border-2 border-gray-200 hover:border-blue-400 text-gray-700 hover:text-blue-600 font-semibold px-6 py-3 rounded-full transition-all duration-200 shadow-sm hover:shadow-md"
