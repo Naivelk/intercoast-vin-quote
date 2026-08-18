@@ -1,0 +1,39 @@
+name: Actualizar reseñas de Google
+
+on:
+  schedule:
+    # Todos los lunes a las 9:00 AM hora de California (16:00 UTC)
+    - cron: '0 16 * * 1'
+  workflow_dispatch: {} # permite correrlo manualmente desde la pestaña "Actions"
+
+permissions:
+  contents: write
+
+jobs:
+  update-reviews:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Traer reseñas reales de Google
+        env:
+          VITE_GOOGLE_PLACES_API_KEY: ${{ secrets.VITE_GOOGLE_PLACES_API_KEY }}
+        run: node scripts/fetch-google-reviews.mjs
+
+      - name: Publicar cambios si hay reseñas nuevas
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet public/data/google-reviews.json; then
+            echo "Sin cambios en las reseñas."
+          else
+            git add public/data/google-reviews.json
+            git commit -m "chore: actualizar reseñas de Google (automático)"
+            git push
+          fi

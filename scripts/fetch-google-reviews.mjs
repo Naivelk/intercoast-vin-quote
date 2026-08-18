@@ -12,26 +12,30 @@ import { dirname, join } from 'path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, '..');
 
-// Cargar .env manualmente (sin dependencias extra)
-function loadEnv() {
+// Cargar .env manualmente si existe (local); en CI se usa process.env directamente
+function loadDotEnv() {
   const envPath = join(rootDir, '.env');
-  const content = readFileSync(envPath, 'utf-8');
-  const env = {};
-  for (const line of content.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const idx = trimmed.indexOf('=');
-    if (idx === -1) continue;
-    env[trimmed.slice(0, idx)] = trimmed.slice(idx + 1);
+  try {
+    const content = readFileSync(envPath, 'utf-8');
+    const env = {};
+    for (const line of content.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const idx = trimmed.indexOf('=');
+      if (idx === -1) continue;
+      env[trimmed.slice(0, idx)] = trimmed.slice(idx + 1);
+    }
+    return env;
+  } catch {
+    return {};
   }
-  return env;
 }
 
-const env = loadEnv();
-const API_KEY = env.VITE_GOOGLE_PLACES_API_KEY;
+const dotEnv = loadDotEnv();
+const API_KEY = process.env.VITE_GOOGLE_PLACES_API_KEY || dotEnv.VITE_GOOGLE_PLACES_API_KEY;
 
 if (!API_KEY) {
-  console.error('Falta VITE_GOOGLE_PLACES_API_KEY en .env');
+  console.error('Falta VITE_GOOGLE_PLACES_API_KEY (en .env local o en el secreto de GitHub Actions)');
   process.exit(1);
 }
 
