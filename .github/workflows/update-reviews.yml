@@ -2,8 +2,8 @@ name: Actualizar reseñas de Google
 
 on:
   schedule:
-    # Todos los lunes a las 9:00 AM hora de California (16:00 UTC)
-    - cron: '0 16 * * 1'
+    # Todos los días a las 6:00 AM hora de California (13:00 UTC)
+    - cron: '0 13 * * *'
   workflow_dispatch: {} # permite correrlo manualmente desde la pestaña "Actions"
 
 permissions:
