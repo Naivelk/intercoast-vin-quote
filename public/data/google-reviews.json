@@ -1,20 +1,36 @@
 {
-  "generatedAt": "2026-08-18T15:37:12.270Z",
+  "generatedAt": "2026-08-19T13:35:26.220Z",
   "reviews": [
     {
       "office": "South Gate",
-      "author": "Lucia Morales",
+      "author": "Susan Escalante",
       "rating": 5,
-      "text": "Excellent service! Everything was explained very well. I got quotes from so many places that when I heard your prices I was so happy. 💝",
-      "relativeTime": "3 months ago",
+      "text": "The beat experience i have ever had, the customer service is awesome. The agents are wonderful and they know about everything, if you have a accident they help you do the claim, and they resolve the problem fast. I will recommend Intercoast insurance to everyone, they also have the best rates and good discounts for you auto insurance",
+      "relativeTime": "in the last week",
+      "language": "en"
+    },
+    {
+      "office": "South Gate",
+      "author": "Bebé Patrón",
+      "rating": 5,
+      "text": "HOLA MI GENTE BONITA DE LOS ÁNGELES CALIFORNIA! LES QUIERO RECOMENDAR MUCHO ESTA OFICINA, SI DESEAS UNA COTIZACIÓN, RÁPIDA, FÁCIL Y 100% SEGURA PARA TI. ESTÁS LLEGANDO AL LUGAR CORRECTO ✅! LA UBICACIÓN ES PERFECTA, CUENTA CON AMENIDADES A SUS AL REDEDORES. LES RECOMENDAMOS MUCHO ESTE LUGAR MI FAMILIA Y YO🥹",
+      "relativeTime": "in the last week",
       "language": "es"
     },
     {
       "office": "South Gate",
-      "author": "Alexander Becerra",
+      "author": "INTERCOAS INSURANCE",
       "rating": 5,
-      "text": "Review for Natalia Pardo - Intercom\n\n⭐️⭐️⭐️⭐️⭐️\n\nI want to express my sincere gratitude to Natalia Pardo for the exceptional service she has provided me for over a year regarding my car insurance in Los Angeles. From the first contact, Natalia has proven to be a dedicated and attentive professional, ensuring I am always well-informed about my policy and payments.\n\nWhat I appreciate most is her dedication; she constantly reminds me of payment due dates and takes the time to call me to verify that everything is in order. This customer service is something I have greatly valued, as it has saved me a lot of worry and ensured that I never lose coverage.\n\nAs a fellow Colombian, Natalia represents not only excellent service but also a personal connection that makes the process much more user-friendly. I wholeheartedly recommend Natalia Pardo and Intercom to anyone looking for reliable and exceptional insurance service.\n\nThank you, Natalia, for all your support!",
-      "relativeTime": "5 months ago",
+      "text": "Gente profesional y muy educada, excelente atención los mejores descuentos y las coberturas de mucho respaldo.",
+      "relativeTime": "in the last week",
+      "language": "es"
+    },
+    {
+      "office": "South Gate",
+      "author": "Kevin Santiago",
+      "rating": 5,
+      "text": "Excellent customer service",
+      "relativeTime": "in the last week",
       "language": "es"
     }
   ]
