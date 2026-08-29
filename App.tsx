@@ -12,6 +12,10 @@ import EvaBubbleButton from './components/eva/EvaBubbleButton';
 import EvaMascotCTA from './components/EvaMascotCTA';
 import BrandStrip from './components/eva/BrandStrip';
 import CountriesStrip from './components/worldcup/WorldCupCountries';
+import QuickActions from './components/QuickActions';
+import SavingsCalculator from './components/SavingsCalculator';
+import MobileActionBar from './components/MobileActionBar';
+import IdentityInviteHandler from './components/IdentityInviteHandler';
 
 // Carga diferida de componentes pesados
 const TrustBadges = lazy(() => import('./components/TrustBadges'));
@@ -23,29 +27,33 @@ const Contact = lazy(() => import('./components/Contact'));
 const Footer = lazy(() => import('./components/Footer'));
 const OfferButton = lazy(() => import('./components/OfferButton'));
 const InsurancePolicies = lazy(() => import('./components/InsurancePolicies'));
+const AdminPanel = lazy(() => import('./components/AdminPanel'));
 
 const App: React.FC = () => {
   return (
-    <div
+    <IdentityInviteHandler><div
       className="min-h-screen flex flex-col"
       style={{ background: '#F8F9FA' }}
     >
       <div className="relative z-10 flex flex-col min-h-screen">
+        {(window.location.pathname === '/admin' || window.location.pathname === '/admin/') ? <Suspense fallback={<Loader />}><AdminPanel /></Suspense> : <>
         <EvaSoundHub />
         <Header />
 
         <main className="flex-grow">
           <ErrorBoundary>
             <Hero />
+            {/* La franja de comunidades es lo primero que ve el visitante al terminar el hero. */}
+            <CountriesStrip />
+
+            <QuickActions />
 
             <Suspense fallback={<Loader />}>
-              {/* Franja de comunidades que atendemos */}
-              <CountriesStrip />
-
               <TrustBadges />
               <EvaMascotCTA />
 
               <QuoteForm />
+              <SavingsCalculator />
               <WaveSeparator direction="down" fillColor="#F8F9FA" height="80px" />
               <Benefits />
               <BrandStrip />
@@ -69,8 +77,10 @@ const App: React.FC = () => {
           <Chatbot embedded />
         </EvaPhoneDock>
         <EvaBubbleButton />
+        <MobileActionBar />
+        </>}
       </div>
-    </div>
+    </div></IdentityInviteHandler>
   );
 };
 

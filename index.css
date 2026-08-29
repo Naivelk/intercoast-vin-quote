@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+:root {
+  --primary-blue: #0057d9;
+  --accent-gold: #ffc107;
+  --light-bg: #f8f9fa;
+  --main-text: #212529;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 100px;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  font-family: 'Poppins', sans-serif;
+  color: var(--main-text);
+  background-color: var(--light-bg);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+@media (max-width: 767px) {
+  body { padding-bottom: calc(4.75rem + env(safe-area-inset-bottom)); }
+}
+
+/* El tema oscuro del panel se limita al área administrativa. Así no altera la
+   landing pública ni las interfaces originales de los clientes. */
+.admin-shell {
+  color-scheme: light;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+.admin-shell.dark {
+  color-scheme: dark;
+  background: #070d1a !important;
+  color: #e6edf7;
+}
+
+.admin-shell.dark .admin-header,
+.admin-shell.dark .admin-surface,
+.admin-shell.dark :is(article, aside, nav, section, div).bg-white {
+  background-color: #101827 !important;
+  border-color: #243148 !important;
+  color: #e6edf7;
+}
+
+.admin-shell.dark :is(.bg-slate-50, .bg-slate-50\/70, .bg-slate-100) {
+  background-color: #172235 !important;
+}
+
+.admin-shell.dark :is(.text-slate-950, .text-slate-900, .text-slate-800, .text-slate-700) {
+  color: #f2f6fc !important;
+}
+
+.admin-shell.dark :is(.text-slate-600, .text-slate-500) {
+  color: #a9b7ca !important;
+}
+
+.admin-shell.dark .text-slate-400 {
+  color: #8291a8 !important;
+}
+
+.admin-shell.dark :is(.border-slate-100, .border-slate-200, .divide-slate-100) {
+  border-color: #26344b !important;
+}
+
+.admin-shell.dark :is(input, select, textarea, .admin-input) {
+  background-color: #0b1322 !important;
+  border-color: #30405a !important;
+  color: #f2f6fc !important;
+}
+
+.admin-shell.dark :is(input, textarea)::placeholder {
+  color: #718199;
+}
+
+.admin-shell.dark table thead {
+  background-color: #172235 !important;
+}
+
+.admin-shell.dark table tr:hover,
+.admin-shell.dark .hover\:bg-blue-50:hover,
+.admin-shell.dark .hover\:bg-blue-50\/60:hover {
+  background-color: #142543 !important;
+}
+
+.admin-shell.dark .admin-header-button,
+.admin-shell.dark a.border-slate-200,
+.admin-shell.dark button.border-slate-200 {
+  border-color: #30405a !important;
+  color: #dce7f5;
+}
+
+.admin-shell.dark kbd {
+  background: #202c40 !important;
+}
+
+.admin-shell.dark .shadow-sm,
+.admin-shell.dark .shadow-md,
+.admin-shell.dark .shadow-lg,
+.admin-shell.dark .shadow-xl {
+  --tw-shadow-color: rgb(0 0 0 / 0.35);
+}
+
+@media (max-width: 767px) {
+  .admin-shell {
+    padding-bottom: 0;
+  }
+}

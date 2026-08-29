@@ -13,6 +13,7 @@ export type HandoffEventDetail = {
 const EVENT_NAME = 'chatbot:open';
 const HANDOFF_EVENT_NAME = 'chatbot:handoff';
 const MOOD_EVENT_NAME = 'chatbot:mood';
+const QUICK_ACTION_EVENT_NAME = 'chatbot:quick-action';
 
 export type MoodEventDetail = {
   mood: 'neutral' | 'thinking' | 'happy' | 'concerned';
@@ -32,6 +33,21 @@ export function onOpenChatbot(handler: (detail: ChatbotOpenEventDetail) => void)
   }
   window.addEventListener(EVENT_NAME, listener);
   return () => window.removeEventListener(EVENT_NAME, listener);
+}
+
+export function startChatbotFlow(message: string) {
+  // The phone dock is controlled separately from the chat timeline. Open it
+  // first, then deliver the selected intent once the dialog is available.
+  window.dispatchEvent(new CustomEvent('eva:dock:open'));
+  window.setTimeout(() => {
+    window.dispatchEvent(new CustomEvent<ChatbotOpenEventDetail>(QUICK_ACTION_EVENT_NAME, { detail: { message } }));
+  }, 180);
+}
+
+export function onChatbotQuickAction(handler: (detail: ChatbotOpenEventDetail) => void) {
+  const listener = (event: Event) => handler((event as CustomEvent<ChatbotOpenEventDetail>).detail || {});
+  window.addEventListener(QUICK_ACTION_EVENT_NAME, listener);
+  return () => window.removeEventListener(QUICK_ACTION_EVENT_NAME, listener);
 }
 
 export function requestHandoff(detail: HandoffEventDetail = {}) {

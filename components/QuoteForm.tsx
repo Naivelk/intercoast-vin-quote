@@ -79,7 +79,7 @@ const QuoteForm: React.FC = () => {
   }, []);
 
   // Usar URL absoluta para producción y relativa para desarrollo
-  const formUrl = process.env.NODE_ENV === 'production' 
+  const formUrl = import.meta.env.PROD
     ? '/formulario/index.html' 
     : '/formulario/index.html';
 

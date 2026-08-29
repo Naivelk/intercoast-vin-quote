@@ -40,7 +40,7 @@ class ErrorBoundary extends Component<Props, State> {
               </h3>
               <div className="mt-2 text-sm text-red-700">
                 <p>Lo sentimos, ha ocurrido un error inesperado. Por favor, recarga la página o inténtalo de nuevo más tarde.</p>
-                {process.env.NODE_ENV === 'development' && (
+                {import.meta.env.DEV && (
                   <details className="mt-2 text-xs text-red-600">
                     <summary>Detalles del error</summary>
                     <div className="mt-1 p-2 bg-red-100 rounded">

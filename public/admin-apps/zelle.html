@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <style>
+    /* ═══ MORADO ZELLE, VERDE EL DINERO ═══
+       La consola del manager es azul oscuro. Esta NO se le parece, y además
+       usa el morado de Zelle para que el agente sepa de un vistazo qué está
+       mirando.
+       El verde queda reservado a UNA sola cosa: el dinero que entró. Cuando la
+       página entera era verde, la cifra —lo único que el agente viene a ver—
+       se perdía entre el fondo. Sobre morado salta.
+       Pensada para un teléfono a una mano, no para un escritorio. */
+    :root {
+      --fondo:    #0D0718;
+      --tarjeta:  #1A1030;
+      --borde:    #2E1D4E;
+      --texto:    #F1EAFB;
+      --tenue:    #A08CC4;
+      --zelle:    #9B54FF;
+      --zelle2:   #6D1ED4;
+      --verde:    #4AE29A;
+      --ambar:    #FFC34D;
+      --rojo:     #FF7A6E;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      margin: 0;
+      padding: 0 0 48px;
+      background: var(--fondo);
+      background-image:
+        radial-gradient(130% 55% at 50% -8%, rgba(155,84,255,.24) 0%, rgba(13,7,24,0) 62%),
+        radial-gradient(90% 40% at 100% 0%, rgba(109,30,212,.16) 0%, rgba(13,7,24,0) 70%);
+      background-attachment: fixed;
+      color: var(--texto);
+      font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    .envoltura { max-width: 620px; margin: 0 auto; padding: 0 14px; }
+
+    /* ---------- encabezado ---------- */
+
+    header { padding: 26px 0 6px; }
+
+    h1 {
+      margin: 0;
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      display: flex; align-items: center; gap: 9px;
+    }
+    h1 .texto {
+      background: linear-gradient(92deg, #C9A5FF 0%, var(--zelle) 55%, var(--zelle2) 100%);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    /* Una insignia morada con la Z. NO es el logo oficial de Zelle: ese es una
+       marca registrada y dibujarlo de memoria saldría mal y además no
+       corresponde. Esto evoca, no copia. Si algún día se quiere el de verdad,
+       se descarga el oficial y se incrusta. */
+    h1 .zeta {
+      flex: 0 0 auto;
+      width: 38px; height: 38px;
+      display: grid; place-items: center;
+      border-radius: 11px;
+      background: linear-gradient(150deg, var(--zelle) 0%, var(--zelle2) 100%);
+      color: #FFFFFF;
+      -webkit-text-fill-color: #FFFFFF;
+      font-size: 21px; font-weight: 800; font-style: italic;
+      box-shadow: 0 4px 14px rgba(109,30,212,.45);
+    }
+
+    .lema { margin: 3px 0 0; font-size: 13.5px; color: var(--tenue); }
+
+    /* La frescura va en una píldora con su punto de color: en esta página es
+       lo más importante después de los pagos. Ver una lista vieja creyéndola
+       fresca hace que un agente le diga a un cliente que su plata no llegó. */
+    .sello {
+      display: inline-flex; align-items: center; gap: 7px;
+      margin-top: 12px; padding: 6px 13px 6px 10px;
+      background: var(--tarjeta);
+      border: 1px solid var(--borde);
+      border-radius: 99px;
+      font-size: 12.5px; color: var(--tenue);
+    }
+    .punto {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--verde);
+      box-shadow: 0 0 0 3px rgba(74,226,154,.18);
+    }
+    .sello.viejo { color: var(--ambar); border-color: rgba(255,195,77,.32); }
+    .sello.viejo .punto { background: var(--ambar); box-shadow: 0 0 0 3px rgba(255,195,77,.16); }
+    .sello[hidden] { display: none; }   /* igual que .barra: el display gana */
+
+    /* ---------- barra ---------- */
+
+    .barra {
+      position: sticky; top: 0; z-index: 5;
+      padding: 13px 0 12px;
+      background: linear-gradient(var(--fondo) 76%, rgba(13,7,24,0));
+      display: flex; gap: 8px;
+    }
+    .barra[hidden] { display: none; }   /* `display:flex` le gana a `hidden` */
+
+    .campo { position: relative; flex: 1; min-width: 0; }
+    .campo .lupa {
+      position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+      font-size: 15px; opacity: .65; pointer-events: none;
+    }
+
+    input[type="search"] {
+      width: 100%;
+      padding: 14px 14px 14px 40px;
+      font-size: 16px;            /* menos de 16 y iOS hace zoom al enfocar */
+      color: var(--texto);
+      background: var(--tarjeta);
+      border: 1px solid var(--borde);
+      border-radius: 14px;
+      outline: none; appearance: none;
+      transition: border-color .15s;
+    }
+    input[type="search"]:focus { border-color: var(--zelle); }
+    input[type="search"]::placeholder { color: var(--tenue); }
+
+    button {
+      padding: 14px 16px;
+      font: inherit; font-size: 15px; font-weight: 650;
+      color: #FFFFFF;
+      background: linear-gradient(160deg, var(--zelle) 0%, var(--zelle2) 100%);
+      border: 0; border-radius: 14px; cursor: pointer;
+      white-space: nowrap;
+      transition: transform .12s, opacity .12s;
+    }
+    button:active { transform: scale(.96); }
+    button[disabled] { opacity: .55; }
+
+    /* ---------- "buscando" ---------- */
+
+    .buscando {
+      display: flex; align-items: center; gap: 9px;
+      margin: 4px 0 14px; padding: 12px 14px;
+      background: rgba(155,84,255,.12);
+      border: 1px solid rgba(155,84,255,.34);
+      border-radius: 14px;
+      font-size: 13.5px; color: var(--texto);
+    }
+    .buscando.falla {
+      background: rgba(255,195,77,.09);
+      border-color: rgba(255,195,77,.32);
+      color: var(--ambar);
+    }
+
+    /* ---------- días ---------- */
+
+    .dia {
+      display: flex; align-items: baseline; gap: 8px;
+      margin: 22px 0 10px;
+    }
+    .dia .cual {
+      font-size: 12.5px; font-weight: 800;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--texto);
+    }
+    .dia .cuantos { font-size: 12px; color: var(--tenue); }
+
+    /* ---------- pagos ---------- */
+
+    .pago {
+      display: flex; align-items: center; gap: 12px;
+      padding: 13px 14px;
+      margin-bottom: 9px;
+      background: var(--tarjeta);
+      border: 1px solid var(--borde);
+      border-radius: 16px;
+      animation: entra .32s ease both;
+    }
+    @keyframes entra {
+      from { opacity: 0; transform: translateY(7px); }
+      to   { opacity: 1; transform: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .pago { animation: none; }
+    }
+
+    /* Las iniciales con color propio: con 20 pagos en pantalla, el ojo
+       encuentra antes una mancha de color conocida que una línea de texto. */
+    .iniciales {
+      flex: 0 0 auto;
+      width: 42px; height: 42px;
+      display: grid; place-items: center;
+      border-radius: 13px;
+      font-size: 14px; font-weight: 800; letter-spacing: .02em;
+      color: #150A24;
+    }
+
+    .quien { flex: 1; min-width: 0; }
+    .nombre { font-weight: 650; font-size: 15.5px; overflow-wrap: anywhere; }
+    .detalle {
+      margin-top: 3px; font-size: 12.5px; color: var(--tenue);
+      overflow-wrap: anywhere;
+    }
+
+    /* Verde, y es el ÚNICO verde de la página.
+       Cuando el fondo era verde también, la cifra se perdía entre lo demás.
+       Sobre el morado de Zelle salta sola, y como no hay otro verde con el que
+       competir, el ojo aprende que verde = plata que entró. */
+    .monto {
+      font-size: 21px; font-weight: 800;
+      color: var(--verde);
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ---------- avisos ---------- */
+
+    .aviso {
+      margin: 30px 0;
+      padding: 30px 20px;
+      background: var(--tarjeta);
+      border: 1px solid var(--borde);
+      border-radius: 18px;
+      color: var(--tenue);
+      text-align: center;
+    }
+    .aviso .icono { font-size: 34px; display: block; margin-bottom: 10px; }
+    .aviso b { color: var(--texto); display: block; margin-bottom: 6px; font-size: 16.5px; }
+    .aviso.malo b { color: var(--rojo); }
+
+    .pie {
+      margin-top: 30px; padding-top: 15px;
+      border-top: 1px solid var(--borde);
+      font-size: 12px; color: var(--tenue); text-align: center; line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="envoltura">
+    <header>
+      <h1><span class="zeta">Z</span><span class="texto">Zelle recibidos</span></h1>
+      <p class="lema">Mira si el pago de tu cliente ya entró, sin preguntarle a nadie.</p>
+      <div class="sello" id="sello" hidden><span class="punto"></span><span id="sello-txt"></span></div>
+    </header>
+
+    <div class="barra" id="barra" hidden>
+      <div class="campo">
+        <span class="lupa">🔍</span>
+        <input type="search" id="q" placeholder="Nombre o monto…"
+               autocomplete="off" autocorrect="off" spellcheck="false">
+      </div>
+      <button id="recargar" type="button">Actualizar</button>
+    </div>
+
+    <div id="lista"></div>
+
+    <div class="pie">
+      Solo los pagos que <b>entraron</b>. 💡 Si no lo ves, búscalo por el monto:
+      a veces paga un familiar y el nombre no es el del cliente.
+    </div>
+  </div>
+
+  <!-- Los datos viajan en su propio bloque, no dentro del código.
+       Metidos en un string de JavaScript, un apellido como O'BRIEN cerraba la
+       comilla y partía la página. Acá el contenido es texto y nada más: lo
+       único que podría escaparse es "</script>", y el "<" ya viene neutralizado
+       desde el servidor. -->
+  <script type="application/json" id="datos-json"><?!= datos ?></script>
+
+  <script>
+    // El servidor ya mandó todo. No hay ninguna llamada de vuelta: esta página
+    // no puede pedirle nada al proyecto, y por eso el proyecto no expone nada.
+    var DATOS = JSON.parse(document.getElementById("datos-json").textContent);
+
+    var lista    = document.getElementById("lista");
+    var sello    = document.getElementById("sello");
+    var selloTxt = document.getElementById("sello-txt");
+    var barra    = document.getElementById("barra");
+    var caja     = document.getElementById("q");
+
+    var boton = document.getElementById("recargar");
+
+    /**
+     * Navegar de verdad.
+     *
+     * Esta página vive dentro de un iframe de otro origen, así que `location`
+     * apunta al marco y no a la aplicación: recargar ahí no vuelve a pedirle
+     * nada al servidor. Un enlace con `target="_top"` sí mueve la ventana
+     * entera, que es lo que hace falta.
+     */
+    function irA(url) {
+      parent.postMessage({ type: "intercoast-zelle-refresh" }, "*");
+    }
+
+    // El botón NO lee el correo —esta página no puede— sino que se lo pide a la
+    // consola, que sí, y espera a que termine. Ver `zelPedir_` en Codigo.js.
+    boton.addEventListener("click", function () {
+      boton.disabled = true;
+      boton.textContent = "Buscando…";
+      irA(DATOS.urlPedir);
+    });
+
+    /** Sin tildes y en minúsculas: nadie escribe "MARÍA" con tilde al buscar. */
+    function normal(t) {
+      return String(t == null ? "" : t)
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase().trim();
+    }
+
+    function dinero(n) {
+      return "$" + Number(n || 0).toLocaleString("en-US", {
+        minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    /** Dos iniciales: la primera palabra y la última. */
+    function iniciales(nombre) {
+      var p = String(nombre || "").trim().split(/\s+/).filter(Boolean);
+      if (!p.length) return "?";
+      if (p.length === 1) return p[0].substring(0, 2).toUpperCase();
+      return (p[0][0] + p[p.length - 1][0]).toUpperCase();
+    }
+
+    /**
+     * Un color estable por persona, sacado del nombre.
+     *
+     * Estable importa: si el color cambiara entre recargas, dejaría de servir
+     * para reconocer a alguien de un vistazo, que es justo para lo que está.
+     * Se queda en verdes y azules para no pelearse con el resto de la página.
+     */
+    function colorDe(nombre) {
+      var h = 0, s = String(nombre || "");
+      for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360;
+
+      // Se evita la franja verde (100–170): en esta página el verde significa
+      // "plata que entró" y no debe significar nada más. Unas iniciales verdes
+      // le quitarían fuerza al único sitio donde ese color importa.
+      if (h > 100 && h < 170) h += 90;
+
+      return "linear-gradient(150deg, hsl(" + h + ",58%,66%), hsl(" + h + ",52%,50%))";
+    }
+
+    /** "2026-08-05" → "hoy" · "ayer" · "martes 4 de agosto" */
+    var MESES = ["enero","febrero","marzo","abril","mayo","junio","julio",
+                 "agosto","septiembre","octubre","noviembre","diciembre"];
+    var DIAS  = ["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
+
+    function diaLegible(iso, hoyIso) {
+      if (iso === hoyIso) return { emoji: "📅", texto: "hoy" };
+
+      var p = String(iso).split("-");
+      if (p.length !== 3) return { emoji: "📅", texto: iso };
+      var d = new Date(+p[0], +p[1] - 1, +p[2]);
+      if (isNaN(d)) return { emoji: "📅", texto: iso };
+
+      var h = String(hoyIso).split("-");
+      if (h.length === 3) {
+        var ayer = new Date(+h[0], +h[1] - 1, +h[2]);
+        ayer.setDate(ayer.getDate() - 1);
+        if (d.getTime() === ayer.getTime()) return { emoji: "🕐", texto: "ayer" };
+      }
+      return { emoji: "🗓️", texto: DIAS[d.getDay()] + " " + d.getDate() + " de " + MESES[d.getMonth()] };
+    }
+
+    /** Todo con textContent: los nombres y las notas los escribe gente de afuera. */
+    function elemento(tipo, clase, texto) {
+      var e = document.createElement(tipo);
+      if (clase) e.className = clase;
+      if (texto != null) e.textContent = texto;
+      return e;
+    }
+
+    function aviso(icono, titulo, cuerpo, malo) {
+      var d = elemento("div", "aviso" + (malo ? " malo" : ""));
+      d.appendChild(elemento("span", "icono", icono));
+      d.appendChild(elemento("b", null, titulo));
+      d.appendChild(document.createTextNode(cuerpo));
+      return d;
+    }
+
+    function tarjeta(p) {
+      var fila = elemento("div", "pago");
+
+      var ini = elemento("div", "iniciales", iniciales(p.nombre));
+      ini.style.background = colorDe(p.nombre);
+      fila.appendChild(ini);
+
+      var quien = elemento("div", "quien");
+      quien.appendChild(elemento("div", "nombre", p.nombre || "(sin nombre)"));
+
+      var detalle = "🕐 " + p.hora;
+      if (p.nota) detalle += "  ·  📝 " + p.nota;
+      quien.appendChild(elemento("div", "detalle", detalle));
+
+      fila.appendChild(quien);
+      fila.appendChild(elemento("div", "monto", dinero(p.monto)));
+      return fila;
+    }
+
+    function pintar(pagos, hoyIso) {
+      lista.textContent = "";
+
+      if (!pagos.length) {
+        lista.appendChild(aviso("🔍", "Sin resultados",
+          "Ningún pago coincide. Prueba con el monto exacto."));
+        return;
+      }
+
+      // Los conteos se cuentan sobre lo que se va a pintar, no sobre el total:
+      // con un filtro puesto, decir "7 pagos" y mostrar 1 es mentir.
+      var porDia = {};
+      pagos.forEach(function (p) { porDia[p.fecha] = (porDia[p.fecha] || 0) + 1; });
+
+      var diaActual = null;
+
+      pagos.forEach(function (p) {
+        if (p.fecha !== diaActual) {
+          diaActual = p.fecha;
+          var d = diaLegible(p.fecha, hoyIso);
+          var cab = elemento("div", "dia");
+          cab.appendChild(elemento("span", "cual", d.emoji + "  " + d.texto));
+          cab.appendChild(elemento("span", "cuantos",
+            porDia[p.fecha] === 1 ? "1 pago" : porDia[p.fecha] + " pagos"));
+          lista.appendChild(cab);
+        }
+        lista.appendChild(tarjeta(p));
+      });
+    }
+
+    function arrancar() {
+      if (!DATOS.autorizado) {
+        lista.appendChild(aviso("🔒", "No disponible",
+          "Abre la página con el enlace completo que te pasaron.", true));
+        return;
+      }
+
+      if (DATOS.error) {
+        lista.appendChild(aviso("⚠️", "No se pudo leer la lista", DATOS.error, true));
+        return;
+      }
+
+      if (!DATOS.publicada) {
+        lista.appendChild(aviso("⏳", "Todavía no hay pagos publicados",
+          "La lista se arma sola durante el día. Vuelve a intentarlo en unos minutos."));
+        return;
+      }
+
+      // La antigüedad se muestra SIEMPRE. Confirmar un pago mirando una lista
+      // vieja es decirle a un cliente que su dinero no llegó cuando sí llegó.
+      var min = DATOS.antiguedad;
+      sello.hidden = false;
+
+      if (min == null) {
+        selloTxt.textContent = "No se sabe cuándo se actualizó";
+        sello.className = "sello viejo";
+      } else if (min < 60) {
+        selloTxt.textContent = min < 1 ? "Actualizado hace un momento"
+                             : min === 1 ? "Actualizado hace 1 minuto"
+                             : "Actualizado hace " + min + " minutos";
+        if (min > 20) sello.className = "sello viejo";
+      } else {
+        // Pasada la hora se cuenta en horas —"hace 209 minutos" no se lee— y se
+        // dice de frente que puede estar vieja: a esa altura el silencio se
+        // interpreta como que el pago no llegó.
+        var h = Math.floor(min / 60), m = min % 60;
+        selloTxt.textContent = "Actualizado hace " + h + " h" + (m ? " " + m + " min" : "") +
+                               " — puede estar desactualizada";
+        sello.className = "sello viejo";
+      }
+
+      // Se refresca sola, al mismo ritmo al que la consola publica la pestaña.
+      // Así los dos lados —esta página y la consola del manager— dicen lo mismo
+      // sin que nadie tenga que acordarse de recargar.
+      //
+      // Dos frenos: solo con la pantalla a la vista, porque un teléfono con
+      // esto abierto en el bolsillo estaría recargando toda la noche; y solo si
+      // nadie está buscando, porque recargar mientras alguien escribe le borra
+      // lo que llevaba.
+      function refrescar() {
+        if (document.visibilityState !== "visible") return;
+        if (caja.value.trim()) return;
+        irA(DATOS.url);
+      }
+
+      // Si se viene de pulsar el botón, decir cómo fue. La lista que se está
+      // mostrando YA es la nueva: la consola leyó el correo antes de que esta
+      // página se armara.
+      //
+      // Y si falló hay que decirlo con todas las letras: un agente que cree que
+      // acaba de buscar y no ve el pago, le dice a su cliente que su plata no
+      // llegó.
+      if (DATOS.pedido) avisoDelBoton(DATOS.pedido);
+
+      function avisoDelBoton(r) {
+        var caja2 = elemento("div", "buscando" + (r === "ok" ? "" : " falla"));
+
+        if (r === "ok") {
+          caja2.appendChild(elemento("span", null, "✅"));
+          caja2.appendChild(elemento("span", null, "Correo revisado ahora mismo."));
+        } else {
+          caja2.appendChild(elemento("span", null, "⚠️"));
+          caja2.appendChild(elemento("span", null,
+            "No se pudo revisar el correo. Lo que ves es lo último publicado."));
+        }
+
+        lista.parentNode.insertBefore(caja2, lista);
+      }
+
+      setInterval(refrescar, 5 * 60000);
+
+      // Al volver a la página después de un rato, lo que hay en pantalla puede
+      // ser de hace horas. Se recarga al reaparecer, pero no en cada cambio de
+      // pestaña: por debajo de dos minutos no ha cambiado nada.
+      //
+      // Se mide desde que se cargó ESTA página, no con `DATOS.antiguedad`: eso
+      // último es la edad que tenía la lista al renderizar y no envejece —
+      // llevando la página tres horas abierta seguiría diciendo lo mismo.
+      var cargadaEn = Date.now();
+
+      document.addEventListener("visibilitychange", function () {
+        if (Date.now() - cargadaEn >= 2 * 60000) refrescar();
+      });
+
+      var pagos = DATOS.pagos || [];
+      var hoyIso = (pagos.length && DATOS.generada) ? DATOS.generada.split(" ")[0] : "";
+
+      if (!pagos.length) {
+        lista.appendChild(aviso("💤", "Ningún pago todavía",
+          "No ha entrado ningún Zelle en los últimos días."));
+        return;
+      }
+
+      barra.hidden = false;
+
+      // Se busca por nombre y también por monto: el nombre que manda Zelle es
+      // el del titular de la cuenta, que muchas veces no es el del cliente
+      // —paga el esposo, la hija—. Cuando el nombre no ayuda, el monto sí.
+      caja.addEventListener("input", function () {
+        var q = normal(caja.value);
+        if (!q) return pintar(pagos, hoyIso);
+
+        var soloDigitos = q.replace(/[^0-9.]/g, "");
+
+        pintar(pagos.filter(function (p) {
+          if (normal(p.nombre).indexOf(q) !== -1) return true;
+          if (normal(p.nota).indexOf(q) !== -1) return true;
+          return soloDigitos.length >= 2 &&
+                 String(p.monto.toFixed(2)).indexOf(soloDigitos) !== -1;
+        }), hoyIso);
+      });
+
+      pintar(pagos, hoyIso);
+    }
+
+    arrancar();
+  </script>
+</body>
+</html>

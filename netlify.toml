@@ -1,0 +1,49 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api/leads"
+  to = "/.netlify/functions/lead"
+  status = 200
+
+[[redirects]]
+from = "/api/admin/leads"
+to = "/.netlify/functions/admin"
+status = 200
+
+[[redirects]]
+from = "/api/admin/retention"
+to = "/.netlify/functions/retention"
+status = 200
+
+[[redirects]]
+from = "/api/admin/tool"
+to = "/.netlify/functions/admin-tool"
+status = 200
+
+[[redirects]]
+from = "/api/admin/calendar"
+to = "/.netlify/functions/admin-calendar"
+status = 200
+
+[[redirects]]
+from = "/api/admin/audit"
+to = "/.netlify/functions/admin-audit"
+status = 200
+
+[[redirects]]
+from = "/api/admin/diagnostic"
+to = "/.netlify/functions/admin-diagnostic"
+status = 200
+
+[[redirects]]
+from = "/api/admin/vin"
+to = "/.netlify/functions/vin"
+status = 200
+
+[[redirects]]
+  from = "/admin"
+  to = "/index.html"
+  status = 200

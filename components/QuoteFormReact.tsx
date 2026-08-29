@@ -380,36 +380,29 @@ export default function QuoteFormReact() {
         descuento,
         totalConDescuento
       });
-      // Enviar a Google Apps Script
-      const fd = new FormData();
-      fd.append("nombre", nombre);
-      fd.append("nacimiento", nacimiento);
-      fd.append("documento", documento);
-      fd.append("direccion", direccion);
-      fd.append("email", correo);
-      fd.append("telefono", telefono);
-      fd.append("cantidadVehiculos", String(cantidadVehiculos));
-      fd.append("totalEstimado", String(totalConDescuento));
-      vehiculos.forEach((v, idx) => {
-        fd.append(`vehiculo${idx}`, JSON.stringify({
+      // The server validates the lead and forwards it to Apps Script. The Apps
+      // Script URL and relay secret never reach the browser.
+      const leadResponse = await fetch('/api/leads', {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombre, nacimiento, documento, direccion, email: correo, telefono,
+          cantidadVehiculos, totalEstimado: totalConDescuento,
+          fuente: 'Cotizador web',
+          utmSource: new URLSearchParams(window.location.search).get('utm_source') || '',
+          utmCampaign: new URLSearchParams(window.location.search).get('utm_campaign') || '',
+          vehiculos: vehiculos.map((v) => ({
           vin: v.vin,
           year: v.year || '',
           make: v.make || '',
           model: v.model || '',
           bodyClass: v.bodyClass || '',
           estimated: v.estimado || 0
-        }));
+          })),
+        }),
       });
-      fd.append("timestamp", new Date().toISOString());
-      fetch("https://script.google.com/macros/s/AKfycbwc9Wg3fubgmvIMlXPPoJVcgiQ96cQwVU_vIIM1Qr1oIPpO0OkrG-DBCRaVcGjgXiGA/exec", {
-        method: "POST",
-        mode: "no-cors",
-        body: fd
-      }).then(() => {
-        setConfirm("✔️ Cotización guardada. Un asesor te contactará pronto.");
-      }).catch(() => {
-        setConfirm("");
-      });
+      if (!leadResponse.ok) throw new Error('No se pudo guardar la cotización. Intenta nuevamente.');
+      setConfirm("✔️ Cotización guardada. Un asesor te contactará pronto.");
     } catch (err: any) {
       setError(err.message || "Error inesperado");
       // Offer help via chatbot if an error happens
@@ -481,16 +474,18 @@ export default function QuoteFormReact() {
           {error && <div className={cls.error}>{error}</div>}
         </form>
         {resultado && (
-          <div className="mt-6 bg-green-50 p-6 rounded-xl shadow-sm">
-            <h3 className="font-bold text-lg mb-4">✅ {t('quoteForm.resultTitle')} ({resultado.cantidad} {resultado.cantidad === 1 ? t('quoteForm.vehicleSingular') : t('quoteForm.vehiclePlural')})</h3>
-            <div className="bg-green-100 p-3 rounded mb-4 border-l-4 border-green-500">
-              <strong>{t('quoteForm.discountTitle')}</strong> {t('quoteForm.discountDesc')}
+          <div className="mt-6 rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50 to-white p-5 md:p-6 shadow-lg">
+            <div className="flex items-start justify-between gap-4 mb-5">
+              <div><p className="text-sm font-bold uppercase tracking-wide text-emerald-700">Cotización lista</p><h3 className="font-extrabold text-xl text-slate-900 mt-1">✅ {t('quoteForm.resultTitle')}</h3><p className="text-sm text-slate-600 mt-1">{resultado.cantidad} {resultado.cantidad === 1 ? t('quoteForm.vehicleSingular') : t('quoteForm.vehiclePlural')} incluido{resultado.cantidad === 1 ? '' : 's'} en el estimado.</p></div>
+              <span className="shrink-0 rounded-full bg-emerald-600 px-3 py-1 text-xs font-bold text-white">Estimado online</span>
             </div>
-            <div className="mb-4 bg-gray-50 p-4 rounded relative">
-              <div className="font-bold text-lg mb-1">{t('quoteForm.totalLabel')}</div>
-              <div className="text-2xl text-blue-700 font-bold">${resultado.totalConDescuento.toFixed(2)}/mes</div>
-              
-
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+              <div className="rounded-xl bg-blue-700 p-4 text-white"><p className="text-xs text-blue-100">Estimado mensual</p><p className="text-3xl font-extrabold mt-1">${resultado.totalConDescuento.toFixed(2)}</p><p className="text-xs text-blue-100 mt-1">por mes</p></div>
+              <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Referencia anual</p><p className="text-2xl font-extrabold text-slate-900 mt-1">${(resultado.totalConDescuento * 12).toFixed(0)}</p><p className="text-xs text-slate-500 mt-1">antes de ajustes finales</p></div>
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4"><p className="text-xs text-amber-700">Ahorro multi-auto</p><p className="text-2xl font-extrabold text-amber-800 mt-1">${Math.max(0, resultado.estimadoTotal - resultado.totalConDescuento).toFixed(0)}</p><p className="text-xs text-amber-700 mt-1">{Math.round(resultado.descuento * 100)}% aplicado</p></div>
+            </div>
+            <div className="bg-emerald-100 p-3 rounded-lg mb-5 border-l-4 border-emerald-500 text-sm text-emerald-950">
+              <strong>{t('quoteForm.discountTitle')}</strong> {t('quoteForm.discountDesc')}
             </div>
             <div className="mb-4">
               <div className="font-bold mb-2">{t('quoteForm.includedVehicles')}</div>
@@ -513,6 +508,15 @@ export default function QuoteFormReact() {
                 <span className="text-green-600">✔️</span>
                 <span>{t('quoteForm.contactMessage').replace('✔️', '').trim()}</span>
               </div>
+            </div>
+            <div className="mt-5 grid sm:grid-cols-2 gap-3">
+              <a
+                target="_blank"
+                rel="noreferrer"
+                href={`https://wa.me/17756754559?text=${encodeURIComponent(`Hola, acabo de recibir un estimado de $${resultado.totalConDescuento.toFixed(2)} al mes para ${resultado.cantidad} vehículo(s). Quiero continuar con un asesor.`)}`}
+                className="rounded-xl bg-emerald-600 px-4 py-3 text-center font-bold text-white hover:bg-emerald-700 transition-colors"
+              >Continuar por WhatsApp</a>
+              <a href="tel:+15623812012" className="rounded-xl border-2 border-blue-700 px-4 py-3 text-center font-bold text-blue-700 hover:bg-blue-50 transition-colors">Llamar a un asesor</a>
             </div>
             {confirm && showDiscount && (
               <div className="mt-4 animate-fade-in-up">

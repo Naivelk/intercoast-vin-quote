@@ -12,7 +12,6 @@ import {
   MessageRole
 } from './chatbot.types';
 import { config as chatbotConfig, isChatbotStep, steps } from './chatbot.config';
-import { getAIResponseSafe } from './openai';
 import { prepareFormData, calculateTotalEstimate, formatPrice, calculateVehicleEstimate } from './pricingEngine';
 import { decodeVIN2Steps, isValidVIN } from './vin';
 import { requestHandoff, setAssistantMood } from './eventBus';
@@ -52,6 +51,31 @@ const smallTalk = {
 
 // Session TTL (soft): 90 minutes
 const SESSION_TTL_MS = 90 * 60 * 1000;
+const WHATSAPP_PHONE = '17756754559';
+
+function buildWhatsAppUrl(userData: UserData, reason = 'asesoría') {
+  const lines = [
+    'Hola, necesito ayuda de Intercoast Insurance.',
+    `Motivo: ${reason}.`,
+  ];
+  if (userData.name) lines.push(`Nombre: ${userData.name}`);
+  if (userData.vehicles?.length) {
+    lines.push('Vehículos:');
+    userData.vehicles.forEach((vehicle, index) => {
+      const description = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ') || 'Información pendiente';
+      lines.push(`- ${index + 1}: ${description}${vehicle.vin ? ` (VIN: ${vehicle.vin})` : ''}`);
+    });
+  }
+  if (userData.quoteAmount != null) lines.push(`Estimado mostrado: ${formatPrice(userData.quoteAmount)} al mes.`);
+  lines.push('Vengo desde Eva en el sitio web.');
+  return `https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent(lines.join('\n'))}`;
+}
+
+function openWhatsApp(userData: UserData, reason?: string) {
+  const url = buildWhatsAppUrl(userData, reason);
+  window.open(url, '_blank', 'noopener,noreferrer');
+  return url;
+}
 const detectInsuranceType = (input: string): InsuranceType => {
   const lowerInput = input.toLowerCase();
   if (lowerInput.includes('auto') || lowerInput.includes('carro') || lowerInput.includes('vehículo') || lowerInput.includes('vehiculo')) {
@@ -102,49 +126,27 @@ const getNextVehicleQuestion = (vehicleIndex: number, vehicles: Vehicle[]): stri
 // Función para enviar datos a Google Sheets (alineada al formulario web)
 const sendQuoteToGoogleSheets = async (userData: UserData, idempotencyKey?: string) => {
   try {
-    const fd = new FormData();
-    fd.append('nombre', userData.name || '');
-    fd.append('nacimiento', userData.birthDate || '');
-    fd.append('documento', userData.documentNumber || '');
-    fd.append('direccion', userData.address || '');
-    fd.append('email', userData.email || '');
-    fd.append('telefono', userData.phone || '');
-    if (idempotencyKey) fd.append('idempotencyKey', idempotencyKey);
-
     const vehicles = userData.vehicles || [];
     const cantidadVehiculos = Math.min(Math.max(vehicles.length || 1, 1), 5);
-    fd.append('cantidadVehiculos', String(cantidadVehiculos));
-
-    // Total estimado (si ya se calculó), o calcularlo
     const total = userData.quoteAmount != null
       ? userData.quoteAmount
       : calculateTotalEstimate(vehicles as any[], userData.birthDate || '');
-    fd.append('totalEstimado', String(total));
-
-    // Adjuntar cada vehículo como vehiculo{idx}
-    vehicles.forEach((v, idx) => {
-      const estimated = calculateVehicleEstimate(v as any, userData.birthDate || '');
-      fd.append(`vehiculo${idx}`,
-        JSON.stringify({
-          vin: v.vin || '',
-          year: v.year || '',
-          make: v.make || '',
-          model: v.model || '',
-          bodyClass: v.bodyClass || '',
-          estimated: estimated || 0,
-        })
-      );
-    });
-
-    fd.append('timestamp', new Date().toISOString());
-
-    await fetch("https://script.google.com/macros/s/AKfycbwc9Wg3fubgmvIMlXPPoJVcgiQ96cQwVU_vIIM1Qr1oIPpO0OkrG-DBCRaVcGjgXiGA/exec", {
+    const response = await fetch('/api/leads', {
       method: 'POST',
-      mode: 'no-cors',
-      body: fd,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nombre: userData.name || '', nacimiento: userData.birthDate || '', documento: userData.documentNumber || '',
+        direccion: userData.address || '', email: userData.email || '', telefono: userData.phone || '',
+        cantidadVehiculos, totalEstimado: total, idempotencyKey, fuente: 'Eva chatbot',
+        utmSource: new URLSearchParams(window.location.search).get('utm_source') || '',
+        utmCampaign: new URLSearchParams(window.location.search).get('utm_campaign') || '',
+        vehiculos: vehicles.map((v) => ({
+          vin: v.vin || '', year: v.year || '', make: v.make || '', model: v.model || '', bodyClass: v.bodyClass || '',
+          estimated: calculateVehicleEstimate(v as any, userData.birthDate || '') || 0,
+        })),
+      }),
     });
-    console.log('Evento: sent_to_sheets', { conversationId: 'n/a', timestamp: new Date().toISOString() });
-    return true;
+    return response.ok;
   } catch (error) {
     console.error('Error sending quote to Google Sheets:', error);
     return false;
@@ -428,10 +430,17 @@ export const useChatbot = (initialMessage?: string): ChatbotContextType & { isOp
     try { sessionStorage.setItem('CHATBOT_USERDATA_V1', JSON.stringify({ savedAt: Date.now(), data: newUserData })); } catch {}
 
     // Interceptores globales
+    if (lower === 'abrir whatsapp con mi resumen 📲' || lower === 'whatsapp 💬') {
+      openWhatsApp(newUserData, lower.includes('resumen') ? 'continuar mi cotización' : 'consulta por WhatsApp');
+      await addBotMessage('Abrí WhatsApp con tu resumen de cotización. Si no se abrió, usa este enlace: https://wa.me/17756754559', { type: 'suggestion', options: ['Volver al inicio ⬅️'] });
+      setUserData(newUserData);
+      return;
+    }
+
     if (['humano','agente','asesor','llamar'].some(k => lower.includes(k))) {
       requestHandoff({ reason: input, currentStep, userData: newUserData, conversationId: conversationIdRef.current });
-      await addBotMessage('Listo, te conecto con un asesor. Te escribirán en breve. ¿Deseas hacer algo más mientras tanto?', {
-        type: 'suggestion', options: ['Volver al inicio ⬅️', 'Continuar cotización ▶️']
+      await addBotMessage('Con gusto. Puedo abrir WhatsApp con el resumen que ya reunimos para que un asesor continúe sin pedirte todo de nuevo.', {
+        type: 'suggestion', options: ['Abrir WhatsApp con mi resumen 📲', 'Volver al inicio ⬅️', 'Continuar cotización ▶️']
       });
       setUserData(newUserData);
       return;
@@ -510,7 +519,7 @@ export const useChatbot = (initialMessage?: string): ChatbotContextType & { isOp
     const isPredefinedOption = (chatbotConfig.initialSuggestions as readonly string[]).includes(input)
       || (chatbotConfig.policyOptions as readonly string[] | undefined)?.includes?.(input as any)
       || [
-        'Sí, retomar', 'No, empezar de nuevo', 'No tengo el VIN', 'Reingresar VIN', 'Continuar cotización ▶️', 'Hablar con un asesor 👨‍💼', 'Sí, es correcto', 'Corregir', 'Llamar 📞', 'WhatsApp 💬',
+        'Sí, retomar', 'No, empezar de nuevo', 'No tengo el VIN', 'Reingresar VIN', 'Continuar cotización ▶️', 'Hablar con un asesor 👨‍💼', 'Abrir WhatsApp con mi resumen 📲', 'Sí, es correcto', 'Corregir', 'Llamar 📞', 'WhatsApp 💬',
         '¿Qué puedo preguntar? ❓', 'Oficinas y contacto 📍', 'Ver versión extendida 📄', 'Descuentos 💸', 'Renovaciones/SR-22 📄'
       ].includes(input);
     
@@ -548,7 +557,7 @@ export const useChatbot = (initialMessage?: string): ChatbotContextType & { isOp
 
       if (input === 'Hablar con un asesor 👨‍💼') {
         requestHandoff({ reason: 'user_button', currentStep, userData: newUserData, conversationId: conversationIdRef.current });
-        await addBotMessage('Un asesor te contactará en breve. ¿Deseas hacer algo más mientras tanto?', { type: 'suggestion', options: ['Volver al inicio ⬅️'] });
+        await addBotMessage('Puedo abrir WhatsApp con tu resumen para que un asesor continúe contigo de inmediato.', { type: 'suggestion', options: ['Abrir WhatsApp con mi resumen 📲', 'Volver al inicio ⬅️'] });
         setUserData(newUserData);
         return;
       }
@@ -585,11 +594,6 @@ export const useChatbot = (initialMessage?: string): ChatbotContextType & { isOp
       }
       if (input === 'Llamar 📞') {
         await addBotMessage('Puedes llamarnos a:\n• +1 (562) 381-2012\n• +1 (424) 417-1700\n\nTambién puedes volver al inicio para más opciones.', { type: 'suggestion', options: ['Volver al inicio ⬅️'] });
-        setUserData(newUserData);
-        return;
-      }
-      if (input === 'WhatsApp 💬') {
-        await addBotMessage('Escríbenos a WhatsApp: +1 (775) 675-4559\nEnlace: https://wa.me/17756754559', { type: 'suggestion', options: ['Volver al inicio ⬅️'] });
         setUserData(newUserData);
         return;
       }
@@ -931,13 +935,8 @@ export const useChatbot = (initialMessage?: string): ChatbotContextType & { isOp
       }
 
       default:
-        try {
-          const ai = await getAIResponseSafe(messages as any, newUserData);
-          response = ai || "No estoy seguro de cómo responder a eso. ¿Podrías reformular tu pregunta?";
-        } catch {
-          response = "No estoy seguro de cómo responder a eso. ¿Podrías reformular tu pregunta?";
+        response = 'Puedo ayudarte a cotizar, explicarte nuestras pólizas, mostrarte oficinas y contacto, o conectarte con un asesor. ¿Qué necesitas?';
         }
-    }
 
     // Cerrar el bloque if (!isPredefinedOption)
   }

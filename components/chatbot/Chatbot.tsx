@@ -8,7 +8,7 @@ import ChatSuggestions from './ChatSuggestions';
 import { ChatMessage as MessageType, ChatbotContextType } from './chatbot.types';
 import { config as chatbotConfig } from './chatbot.config';
 import { useChatbot } from './chatbot.hooks';
-import { onOpenChatbot, onAssistantMood } from './eventBus';
+import { onOpenChatbot, onAssistantMood, onChatbotQuickAction } from './eventBus';
 import InputPortal from '../eva/InputPortal';
 
 interface ChatbotProps {
@@ -222,6 +222,12 @@ const Chatbot: React.FC<ChatbotProps> = ({
     });
     return unsubscribe;
   }, [isOpen, toggleChatHook, announce, messages.length]);
+
+  useEffect(() => onChatbotQuickAction(({ message }) => {
+    if (!message) return;
+    if (!isOpen) window.dispatchEvent(new CustomEvent('eva:dock:open'));
+    void sendMessage(message);
+  }), [isOpen, sendMessage]);
 
   const handleToggleChat = () => {
     if (isControlled) {

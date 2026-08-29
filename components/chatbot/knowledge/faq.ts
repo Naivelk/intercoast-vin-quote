@@ -7,7 +7,13 @@ export type FaqEntry = {
 };
 
 // Helper to lc and trim
-const lc = (s: string) => (s || '').toLowerCase().trim();
+const lc = (s: string) => (s || '')
+  .toLowerCase()
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^a-z0-9\s-]/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
 
 // About info (Quiénes somos)
 const ABOUT_ANSWER =
@@ -69,7 +75,7 @@ export const FAQ: FaqEntry[] = [
   {
     id: 'renewals',
     scope: 'auto',
-    questions: ['renovaciones', 'renovar', 'renovación', 'renovacion', 'vencimiento', 'lapse', 'cambiar aseguradora', 'cambiar de aseguradora'],
+    questions: ['renovaciones', 'renovar', 'renovación', 'renovacion', 'vencimiento', 'se vence', 'se vencio', 'vence mi seguro', 'expira', 'lapse', 'cambiar aseguradora', 'cambiar de aseguradora'],
     answer: 'Te ayudamos a renovar revisando coberturas y comparando entre aseguradoras para evitar lapsos que suben la prima. Si conviene cambiar de compañía, te lo proponemos.',
     options: ['Cotizar renovación 🔄', 'SR-22 📄', 'Llamar 📞', 'WhatsApp 💬', 'Volver al inicio ⬅️']
   },
@@ -87,8 +93,8 @@ export const FAQ: FaqEntry[] = [
   },
   { id: 'sr22', scope: 'auto', questions: ['sr-22', 'sr22', 'sr 22'], answer: 'Podemos asesorarte en SR-22 cuando corresponde. Lo incluimos en tu propuesta y te guiamos en el proceso.' },
   { id: 'foreign-license', scope: 'auto', questions: ['licencia extranjera', 'licencia de otro país', 'sin licencia usa'], answer: 'En muchos casos puedes asegurar con licencia extranjera vigente. Verificamos con la aseguradora al armar tu propuesta.' },
-  { id: 'report-claim', scope: 'general', questions: ['reporte siniestro', 'reporto siniestro', 'reportar siniestro', 'cómo reporto siniestro', 'como reporto siniestro'], answer: 'Te entregamos un número 24/7 y tu póliza digital. Si ocurre un siniestro, te guío desde aquí o puedes llamar a asistencia.' },
-  { id: 'multi-vehicle-discount', scope: 'auto', questions: ['descuento varios autos', 'varios autos descuento', 'multi auto'], answer: 'Sí, aplicamos descuento progresivo por múltiples vehículos y te mostramos el total combinado con el ahorro.' },
+  { id: 'report-claim', scope: 'general', questions: ['reporte siniestro', 'reporto siniestro', 'reportar siniestro', 'cómo reporto siniestro', 'como reporto siniestro', 'tuve un accidente', 'choque', 'choqué', 'me chocaron', 'crash'], answer: 'Si tuviste un accidente, verifica primero que todos estén a salvo y llama al 911 si hay heridos o peligro. Después podemos orientarte con tu póliza y asistencia. ¿Quieres hablar con un asesor?' },
+  { id: 'multi-vehicle-discount', scope: 'auto', questions: ['descuento varios autos', 'varios autos descuento', 'multi auto', 'dos carros', 'dos autos', 'varios carros', 'asegurar 2 autos'], answer: 'Sí, aplicamos descuento progresivo por múltiples vehículos y te mostramos el total combinado con el ahorro.' },
   { id: 'home-catastrophe', scope: 'home', questions: ['sismo', 'inundación', 'inundacion', 'catastrofica'], answer: 'Depende del plan/aseguradora. Hay añadidos catastróficos. Si te interesa, lo incluyo en la propuesta.' },
   { id: 'home-offsite', scope: 'home', questions: ['bienes portátiles', 'fuera de casa', 'portatiles'], answer: 'Algunos planes cubren bienes fuera del hogar con sublímites. Puedo proponerte un plan con esta extensión.' },
   { id: 'home-requirements', scope: 'home', questions: ['rejas', 'alarmas', 'requisitos hogar'], answer: 'Varias aseguradoras mejoran tarifa si hay rejas, alarmas o medidas de seguridad. Lo reflejo en tu propuesta si aplica.' },
@@ -105,6 +111,21 @@ export function resolveFaq(lower: string): FaqEntry | null {
   for (const e of FAQ) {
     for (const trig of e.questions) {
       if (q.includes(lc(trig))) return e;
+    }
+  }
+
+  // Second pass: recognize natural wording that communicates an intent even
+  // when it does not exactly match a FAQ phrase.
+  const intentKeywords: Record<string, string[]> = {
+    'report-claim': ['accidente', 'choque', 'chocar', 'golpearon'],
+    renewals: ['vence', 'vencida', 'expira', 'renovacion'],
+    'multi-vehicle-discount': ['dos autos', 'dos carros', 'varios autos', 'varios carros'],
+    sr22: ['sr22', 'sr 22'],
+    'foreign-license': ['licencia extranjera', 'licencia de mi pais'],
+  };
+  for (const [id, keywords] of Object.entries(intentKeywords)) {
+    if (keywords.some((keyword) => q.includes(keyword))) {
+      return FAQ.find((entry) => entry.id === id) || null;
     }
   }
   return null;
