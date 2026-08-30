@@ -1,6 +1,14 @@
 {
-  "generatedAt": "2026-08-29T16:54:34.888Z",
+  "generatedAt": "2026-08-30T17:01:44.904Z",
   "reviews": [
+    {
+      "office": "South Gate",
+      "author": "Ninja",
+      "rating": 5,
+      "text": "Natalia the colombiana went above and beyond. She answered all my questions and was really helpful. She was able to find me the best quote. I was satisfied with my limits and service",
+      "relativeTime": "in the last week",
+      "language": "en"
+    },
     {
       "office": "South Gate",
       "author": "may acost",
@@ -30,14 +38,6 @@
       "author": "Bebé Patrón",
       "rating": 5,
       "text": "Hello my beautiful people of Los Angeles, California! I highly recommend this office if you want a quick, easy, and 100% secure quote. You've come to the right place! ✅ The location is perfect, with amenities nearby. My family and I highly recommend this place! 🥹",
-      "relativeTime": "a week ago",
-      "language": "es"
-    },
-    {
-      "office": "South Gate",
-      "author": "INTERCOAS INSURANCE",
-      "rating": 5,
-      "text": "Professional and very polite people, excellent service, the best discounts and very reliable coverage.",
       "relativeTime": "a week ago",
       "language": "es"
     }
