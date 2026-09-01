@@ -145,6 +145,31 @@ type SearchResult = {
           premiumRetenido?: number;
         }>;
       };
+      lineasRecibo?: {
+        disponible: boolean;
+        contrato: string;
+        version: number;
+        fuente: string;
+        total: number;
+        mostradas: number;
+        truncado: boolean;
+        reciboRepetido: boolean;
+        lineas: Array<{
+          recibo: string;
+          fecha: string;
+          tipo: string;
+          bfRetenido: number;
+          premiumRetenido: number;
+          pagado: number;
+          debe: number;
+          estado: string;
+          carrier: string;
+          agente: string;
+          fuenteActualizada: string;
+          candidatas: number;
+          requiereRevision: boolean;
+        }>;
+      };
     }>;
   }>;
 };
@@ -1566,7 +1591,7 @@ export function NativeConsole() {
         await callTool<SearchResult>(
           "consola",
           "buscar",
-          [query.trim(), ""],
+          [query.trim(), "", true],
           true,
         ),
       );
@@ -1684,7 +1709,7 @@ export function NativeConsole() {
             <div className="flex flex-wrap items-center gap-2">
               <h4 className="text-xl font-black">Ficha Unificada</h4>
               <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-blue-700">
-                v1 · solo lectura
+                v2 · solo lectura
               </span>
             </div>
             <p className="text-sm text-slate-500">
@@ -1900,6 +1925,87 @@ export function NativeConsole() {
                             <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
                               No hay recibos válidos para esta póliza.
                             </p>
+                          )}
+                        </div>
+                        <div className="mt-4 border-t border-slate-100 pt-4">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <p className="font-black text-slate-900">
+                                Líneas del recibo
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                Detalle histórico sin colapsar transacciones con
+                                el mismo Receipt#.
+                              </p>
+                            </div>
+                            {policy.lineasRecibo?.disponible && (
+                              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-600">
+                                {policy.lineasRecibo.mostradas} de {policy.lineasRecibo.total}
+                              </span>
+                            )}
+                          </div>
+                          {!policy.lineasRecibo?.disponible ? (
+                            <p className="mt-3 rounded-lg bg-amber-50 p-3 text-xs font-bold text-amber-800">
+                              Historial temporalmente no disponible. El resumen
+                              operativo de arriba sigue siendo válido.
+                            </p>
+                          ) : (
+                            <>
+                              {(policy.lineasRecibo.reciboRepetido ||
+                                policy.lineasRecibo.truncado) && (
+                                <div className="mt-3 space-y-2">
+                                  {policy.lineasRecibo.reciboRepetido && (
+                                    <p className="rounded-lg bg-blue-50 p-3 text-xs font-bold text-blue-800">
+                                      Hay Receipt# repetidos: cada transacción se
+                                      muestra en su propia línea.
+                                    </p>
+                                  )}
+                                  {policy.lineasRecibo.truncado && (
+                                    <p className="rounded-lg bg-amber-50 p-3 text-xs font-bold text-amber-800">
+                                      Se muestran {policy.lineasRecibo.mostradas} de{" "}
+                                      {policy.lineasRecibo.total} líneas.
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                              {policy.lineasRecibo.lineas.length ? (
+                                <div className="mt-3 overflow-x-auto rounded-xl border border-slate-100">
+                                  <table className="w-full min-w-[880px] text-left text-xs">
+                                    <thead className="bg-slate-50 text-slate-500">
+                                      <tr>
+                                        <th className="p-2.5">Fecha</th>
+                                        <th className="p-2.5">Receipt#</th>
+                                        <th className="p-2.5">Tx Type</th>
+                                        <th className="p-2.5 text-right">BF Retained</th>
+                                        <th className="p-2.5 text-right">Premium Retained</th>
+                                        <th className="p-2.5 text-right">Amount Paid</th>
+                                        <th className="p-2.5 text-right">Amount Due</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {policy.lineasRecibo.lineas.map((line, lineIndex) => (
+                                        <tr
+                                          key={`${line.recibo || line.fecha}-${line.tipo}-${lineIndex}`}
+                                          className="border-t border-slate-100"
+                                        >
+                                          <td className="p-2.5">{line.fecha || "—"}</td>
+                                          <td className="p-2.5">{line.recibo || "—"}</td>
+                                          <td className="p-2.5 font-bold">{line.tipo || "—"}</td>
+                                          <td className="p-2.5 text-right">{moneyExact(line.bfRetenido)}</td>
+                                          <td className="p-2.5 text-right">{moneyExact(line.premiumRetenido)}</td>
+                                          <td className="p-2.5 text-right font-bold text-emerald-700">{moneyExact(line.pagado)}</td>
+                                          <td className="p-2.5 text-right font-bold text-amber-800">{moneyExact(line.debe)}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              ) : (
+                                <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
+                                  No hay líneas históricas para esta póliza.
+                                </p>
+                              )}
+                            </>
                           )}
                         </div>
                       </article>
