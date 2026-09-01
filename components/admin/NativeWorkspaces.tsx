@@ -170,6 +170,32 @@ type SearchResult = {
           requiereRevision: boolean;
         }>;
       };
+      terminosPoliza?: {
+        disponible: boolean;
+        contrato: string;
+        version: number;
+        fuente: string;
+        total: number;
+        mostradas: number;
+        truncado: boolean;
+        ambiguos: number;
+        terminos: Array<{
+          desde: string;
+          vence: string;
+          estado: string;
+          estadoCreacion: string;
+          carrier: string;
+          lob: string;
+          prima: number | null;
+          brokerFee: number | null;
+          agente: string;
+          creada: string;
+          cancelada: string;
+          fuenteActualizada: string;
+          candidatas: number;
+          requiereRevision: boolean;
+        }>;
+      };
     }>;
   }>;
 };
@@ -1591,7 +1617,7 @@ export function NativeConsole() {
         await callTool<SearchResult>(
           "consola",
           "buscar",
-          [query.trim(), "", true],
+          [query.trim(), "", true, true],
           true,
         ),
       );
@@ -1709,7 +1735,7 @@ export function NativeConsole() {
             <div className="flex flex-wrap items-center gap-2">
               <h4 className="text-xl font-black">Ficha Unificada</h4>
               <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-blue-700">
-                v2 · solo lectura
+                v3 · solo lectura
               </span>
             </div>
             <p className="text-sm text-slate-500">
@@ -1859,6 +1885,70 @@ export function NativeConsole() {
                             Cancelación registrada: {policy.cancelada}
                           </p>
                         )}
+                        <div className="mt-4 border-t border-slate-100 pt-4">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <p className="font-black text-slate-900">Términos de póliza</p>
+                              <p className="text-xs text-slate-500">
+                                Vigencias históricas conservadas por Sentry.
+                              </p>
+                            </div>
+                            {policy.terminosPoliza?.disponible && (
+                              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-600">
+                                {policy.terminosPoliza.mostradas} de {policy.terminosPoliza.total}
+                              </span>
+                            )}
+                          </div>
+                          {!policy.terminosPoliza?.disponible ? (
+                            <p className="mt-3 rounded-lg bg-amber-50 p-3 text-xs font-bold text-amber-800">
+                              Términos históricos temporalmente no disponibles. La póliza operativa sigue siendo válida.
+                            </p>
+                          ) : (
+                            <>
+                              {!!policy.terminosPoliza.ambiguos && (
+                                <p className="mt-3 rounded-lg bg-amber-50 p-3 text-xs font-bold text-amber-800">
+                                  {policy.terminosPoliza.ambiguos} término(s) tienen observaciones contradictorias y requieren revisión.
+                                </p>
+                              )}
+                              {policy.terminosPoliza.terminos.length ? (
+                                <div className="mt-3 grid gap-2 md:grid-cols-2">
+                                  {policy.terminosPoliza.terminos.map((term, termIndex) => (
+                                    <div
+                                      key={`${term.desde}-${term.vence}-${term.carrier}-${termIndex}`}
+                                      className="rounded-xl border border-slate-100 bg-slate-50 p-3"
+                                    >
+                                      <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                          <p className="text-xs font-black text-slate-900">
+                                            {term.desde || "Sin inicio"} → {term.vence || "Sin vencimiento"}
+                                          </p>
+                                          <p className="mt-1 text-[11px] text-slate-500">
+                                            {[term.carrier, term.estado, term.lob].filter(Boolean).join(" · ") || "Sin detalle"}
+                                          </p>
+                                        </div>
+                                        <span className="text-xs font-black text-slate-700">
+                                          {moneyExact(term.prima)}
+                                        </span>
+                                      </div>
+                                      <p className="mt-2 text-[11px] text-slate-500">
+                                        BF {moneyExact(term.brokerFee)}{term.agente ? ` · ${term.agente}` : ""}
+                                      </p>
+                                      {term.requiereRevision && (
+                                        <p className="mt-2 text-[11px] font-bold text-amber-800">
+                                          Revisar {term.candidatas} observaciones candidatas.
+                                        </p>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
+                                  No hay términos históricos para esta póliza.
+                                </p>
+                              )}
+                            </>
+                          )}
+                        </div>
                         <div className="mt-4 border-t border-slate-100 pt-4">
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
