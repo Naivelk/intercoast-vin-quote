@@ -47,7 +47,7 @@ El adaptador conserva solo lo necesario para medir utilidad:
 - Conductores: solo conteo en esta fase; no nombres ni licencias.
 - Documentos: ID, tipo, título y relación con póliza; no descarga el archivo.
 
-El endpoint público del webhook no devuelve ese contrato. Solo devuelve los
+El endpoint del webhook no devuelve ese contrato. Solo devuelve los
 conteos de pólizas, vehículos, conductores, coberturas y documentos procesados.
 
 ## Prueba local

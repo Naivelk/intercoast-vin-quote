@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import test from "node:test";
-import handler from "./canopy-webhook.mjs";
+import handler from "../functions/canopy-webhook.mjs";
 
 const TEAM_ID = "11111111-1111-4111-8111-111111111111";
 const PULL_ID = "22222222-2222-4222-8222-222222222222";
