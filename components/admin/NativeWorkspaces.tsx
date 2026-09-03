@@ -1327,6 +1327,283 @@ function ControlTrendChart({
   );
 }
 
+/* ═══ LA PORTADA ════════════════════════════════════════════════════════════
+ *
+ * Lo primero que se ve al entrar. No inventa ningún número: junta tres cosas
+ * que ya se leían por separado —la operación por oficina, la asistencia y la
+ * salud del bot— y las pone en el orden en que el manager las mira.
+ *
+ * ⚠️ **Hereda la regla del módulo de operación: ausencia de dato NO es cero.**
+ * Si al periodo le faltan días medidos, se dice arriba y cada cifra lleva sobre
+ * cuántos días está calculada. Si no hay ninguno, no se pinta ninguna cifra.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+function ultimoDiaDelMes(reference: Date) {
+  const y = reference.getFullYear();
+  const m = reference.getMonth();
+  const primero = `${y}-${String(m + 1).padStart(2, "0")}-01`;
+  const siguiente =
+    m === 11
+      ? `${y + 1}-01-01T12:00:00Z`
+      : `${y}-${String(m + 2).padStart(2, "0")}-01T12:00:00Z`;
+  return {
+    desde: primero,
+    hasta: new Date(Date.parse(siguiente) - 86400000).toISOString().slice(0, 10),
+  };
+}
+
+function TotalOficinas({
+  data,
+}: {
+  data: OfficeOperationData | null;
+}) {
+  const oficinas = data?.oficinas || [];
+  if (!oficinas.length) return null;
+  const total = oficinas.reduce((suma, o) => suma + (o.deposit || 0), 0);
+  return <>{moneyExact(total)}</>;
+}
+
+export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }) {
+  const [operacion, setOperacion] = useState<OfficeOperationData | null>(null);
+  const [asistencia, setAsistencia] = useState<AttendanceData | null>(null);
+  const [control, setControl] = useState<ControlData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const rango = useMemo(() => ultimoDiaDelMes(new Date()), []);
+
+  const load = async () => {
+    setLoading(true);
+    /* Los tres bloques son independientes a propósito: que Dropbox no conteste
+     * no puede dejar al manager sin ver quién está trabajando. */
+    const [ope, asis, ctl] = await Promise.allSettled([
+      callTool<OfficeOperationData>("consola", "operacionPorOficina", [
+        rango.desde,
+        rango.hasta,
+      ]),
+      callTool<AttendanceData>("consola", "resumenAsistencia", ["hoy"], true),
+      callTool<ControlData>("consola", "centroControl", []),
+    ]);
+    setOperacion(ope.status === "fulfilled" && ope.value?.ok ? ope.value : null);
+    setAsistencia(asis.status === "fulfilled" && asis.value?.ok ? asis.value : null);
+    setControl(ctl.status === "fulfilled" ? ctl.value : null);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    void load();
+  }, [rango.desde, rango.hasta]);
+
+  const oficinas = operacion?.oficinas || [];
+  const faltan = operacion?.diasSinDato || [];
+  const medidos = operacion?.diasConDato?.length || 0;
+  const cobertura = operacion?.cobertura || null;
+  const trabajando = asistencia?.resumen?.trabajando ?? null;
+  const agentes = asistencia?.agentes?.length ?? null;
+  const problemas = control?.ok ? control.problemas : null;
+  const desactualizadas = control?.ok
+    ? (control.fuentes || []).filter((f) => f.estado === "DESACTUALIZADO").length
+    : null;
+
+  return (
+    <div className="flex flex-col gap-5">
+      <LoadingBar active={loading} />
+
+      {/* ── La franja de cifras ── */}
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <article className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0057d9] to-[#0043AE] p-[18px] text-white shadow-sm">
+          <span className="pointer-events-none absolute -bottom-6 -right-5 h-24 w-24 rounded-full bg-[#ffc107]/20" />
+          <p className="relative text-[10px] font-black uppercase tracking-[.1em] text-white/70">
+            Entró este mes
+          </p>
+          <p className="relative mt-2 text-3xl font-black tabular-nums">
+            {oficinas.length ? <TotalOficinas data={operacion} /> : "—"}
+          </p>
+          <p className="relative mt-2 text-xs font-semibold text-[#FFD65C]">
+            {oficinas.length
+              ? `${medidos} ${medidos === 1 ? "día medido" : "días medidos"}`
+              : "sin días medidos"}
+          </p>
+        </article>
+
+        <Metric
+          label="Agentes trabajando"
+          value={trabajando === null ? "—" : `${trabajando}${agentes ? ` / ${agentes}` : ""}`}
+          hint={trabajando === null ? "no se pudo leer la asistencia" : "jornada abierta ahora"}
+          tone="violet"
+        />
+        <Metric
+          label="Procesos con problema"
+          value={problemas === null ? "—" : problemas}
+          hint={problemas === null ? "no se pudo leer el control" : problemas ? "revisar en Control del bot" : "todo en orden"}
+          tone={problemas ? "amber" : "green"}
+        />
+        <Metric
+          label="Fuentes desactualizadas"
+          value={desactualizadas === null ? "—" : desactualizadas}
+          hint={desactualizadas === null ? "no se pudo leer el control" : desactualizadas ? "un archivo lleva días sin llegar" : "todas al día"}
+          tone={desactualizadas ? "amber" : "green"}
+        />
+      </section>
+
+      {/* ── Lo que falta, arriba y en grande ── */}
+      {!loading && operacion && faltan.length > 0 && (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={19} className="mt-0.5 shrink-0 text-amber-700" />
+            <div className="min-w-0">
+              <p className="text-sm font-black text-amber-900">
+                Del mes faltan {faltan.length} de {operacion.diasPedidos} días por medir.
+              </p>
+              <p className="mt-1 text-sm text-amber-800">
+                {medidos > 0
+                  ? `Las cifras son de los ${medidos} días medidos, no del mes entero. `
+                  : ""}
+                Un día sin fila puede ser un día sin ventas o uno que nadie ha medido:
+                desde aquí no se distinguen.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Las oficinas ── */}
+      <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+        <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 p-5">
+          <div>
+            <h3 className="text-lg font-black text-slate-950">Operación por oficina</h3>
+            <p className="mt-0.5 text-sm text-slate-500">
+              {rango.desde} → {rango.hasta} · lo que entró según Sentry
+            </p>
+          </div>
+          <button
+            onClick={() => void load()}
+            disabled={loading}
+            className="ml-auto inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-800 hover:border-blue-300 hover:bg-blue-50 disabled:opacity-60"
+          >
+            <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> Actualizar
+          </button>
+        </div>
+
+        {!loading && !oficinas.length ? (
+          <div className="m-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+            <p className="text-sm font-black text-slate-700">
+              No hay ningún día medido en este mes.
+            </p>
+            <p className="mt-1 text-sm text-slate-500">
+              No se muestran cifras porque no las hay — no porque valgan cero.
+            </p>
+            {cobertura && (
+              <p className="mt-3 text-sm text-slate-600">
+                Lo medido va del <strong>{cobertura.desde}</strong> al{" "}
+                <strong>{cobertura.hasta}</strong>.
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="grid gap-px bg-slate-100 md:grid-cols-2">
+            {oficinas.map((office) => {
+              const parcial = office.diasParciales.length > 0;
+              return (
+                <div key={office.oficina} className="flex flex-col gap-3 bg-white p-5">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="h-2 w-2 rounded-sm"
+                      style={{
+                        background:
+                          office.oficina === "COMPTON" ? "#7C3AED" : "#0057d9",
+                      }}
+                    />
+                    <span className="text-sm font-black text-slate-950">
+                      {office.oficina}
+                    </span>
+                    <span className="ml-auto rounded-md bg-slate-50 px-2 py-1 text-[10.5px] font-semibold tabular-nums text-slate-500">
+                      {office.dias.length} {office.dias.length === 1 ? "día" : "días"}
+                    </span>
+                    {parcial && (
+                      <span className="rounded-md bg-amber-50 px-2 py-1 text-[10.5px] font-black text-amber-800">
+                        {office.diasParciales.length} a medias
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[.09em] text-slate-500">
+                      Deposit calculado
+                    </p>
+                    <p className="mt-1 text-[27px] font-black leading-none tabular-nums text-slate-950">
+                      {moneyExact(office.deposit)}
+                    </p>
+                  </div>
+
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+                    <div>
+                      <dt className="text-[10.5px] text-slate-500">Fiduciary</dt>
+                      <dd className="mt-0.5 text-sm font-semibold tabular-nums text-slate-800">
+                        {moneyExact(office.fiduciary)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-[10.5px] text-slate-500">Tarjetas</dt>
+                      <dd className="mt-0.5 text-sm font-semibold tabular-nums text-slate-800">
+                        {office.ccNum} · {moneyExact(office.ccMonto)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-[10.5px] text-slate-500">Aplicaciones</dt>
+                      <dd className="mt-0.5 text-sm font-semibold tabular-nums text-slate-800">
+                        {office.apps}
+                        {office.desgloseApps.disponible ? (
+                          <span className="ml-1 text-xs font-medium text-slate-500">
+                            {office.desgloseApps.nb} NB / {office.desgloseApps.rw} RW
+                          </span>
+                        ) : (
+                          <span className="ml-1 text-xs font-medium text-slate-500">
+                            sin desglose
+                          </span>
+                        )}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-[10.5px] text-slate-500">Endosos</dt>
+                      <dd className="mt-0.5 text-sm font-semibold tabular-nums text-slate-800">
+                        {office.endos}
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* ── Atajos a donde se sigue trabajando ── */}
+      <section className="grid gap-3 sm:grid-cols-3">
+        {[
+          { id: "trabajo", label: "Casos de hoy", hint: "la agenda priorizada" },
+          { id: "control", label: "Control del bot", hint: "procesos y órdenes" },
+          { id: "zelle", label: "Zelle de agentes", hint: "lo que entra por transferencia" },
+        ].map((atajo) => (
+          <button
+            key={atajo.id}
+            onClick={() => onNavigate(atajo.id)}
+            className="group flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:bg-blue-50/40"
+          >
+            <span className="min-w-0">
+              <span className="block text-sm font-black text-slate-950">{atajo.label}</span>
+              <span className="block truncate text-xs text-slate-500">{atajo.hint}</span>
+            </span>
+            <ChevronRight
+              size={17}
+              className="ml-auto shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-blue-700"
+            />
+          </button>
+        ))}
+      </section>
+    </div>
+  );
+}
+
 export function SystemControl() {
   const [data, setData] = useState<ControlData | null>(null);
   const [loading, setLoading] = useState(true);

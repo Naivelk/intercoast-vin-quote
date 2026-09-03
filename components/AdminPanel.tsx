@@ -12,6 +12,7 @@ import {
   NativeConsole,
   NativeZelle,
   SystemControl,
+  TodayHome,
 } from "./admin/NativeWorkspaces";
 import {
   AuditEntry,
@@ -979,6 +980,7 @@ export default function AdminPanel() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [view, setView] = useState<
+    | "hoy"
     | "trabajo"
     | "resumen"
     | "leads"
@@ -991,7 +993,7 @@ export default function AdminPanel() {
     | "automatizaciones"
   >(() => {
     const requested = new URLSearchParams(window.location.search).get("view");
-    return requested === "control" ? "control" : "trabajo";
+    return requested === "control" ? "control" : "hoy";
   });
   const [visitedWorkspaces, setVisitedWorkspaces] = useState<string[]>([]);
   const [query, setQuery] = useState("");
@@ -1340,6 +1342,7 @@ export default function AdminPanel() {
         { id: "trabajo", label: "Casos de hoy", icon: <BriefcaseBusiness size={16} /> },
         { id: "calendario", label: "Calendario", icon: <CalendarDays size={16} /> },
         { id: "leads", label: "Leads", icon: <Sparkles size={16} />, badge: unassigned },
+        { id: "resumen", label: "Resumen comercial", icon: <History size={16} /> },
       ],
     },
     {
@@ -1367,7 +1370,8 @@ export default function AdminPanel() {
     setView("leads");
   };
   const TITULOS: Record<string, { titulo: string; bajada: string }> = {
-    resumen: { titulo: "Hoy", bajada: "Lo que entró, lo que falta y quién está trabajando" },
+    hoy: { titulo: "Hoy", bajada: "Lo que entró, lo que falta y quién está trabajando" },
+    resumen: { titulo: "Resumen comercial", bajada: "El embudo de leads y su avance" },
     trabajo: { titulo: "Casos de hoy", bajada: "La agenda priorizada de los seis calendarios" },
     leads: { titulo: "Leads", bajada: "Lo que entra por la web y por la radio" },
     consola: { titulo: "Cartera y clientes", bajada: "Buscador, pólizas y dinero del día" },
@@ -1402,8 +1406,8 @@ export default function AdminPanel() {
 
         <nav aria-label="Secciones del panel" className="flex flex-1 flex-col gap-4 overflow-y-auto px-3 pb-3">
           <button
-            onClick={() => setView("resumen")}
-            aria-current={view === "resumen" ? "page" : undefined}
+            onClick={() => setView("hoy")}
+            aria-current={view === "hoy" ? "page" : undefined}
             className="ic-enlace"
           >
             <Activity size={16} /> Hoy
@@ -1503,8 +1507,8 @@ export default function AdminPanel() {
           className="mb-5 flex gap-1.5 overflow-x-auto lg:hidden"
         >
           <button
-            onClick={() => setView("resumen")}
-            className={`whitespace-nowrap rounded-xl px-3.5 py-2 text-sm font-bold transition ${view === "resumen" ? "bg-[#0057d9] text-white" : "ic-apagado bg-white/70"}`}
+            onClick={() => setView("hoy")}
+            className={`whitespace-nowrap rounded-xl px-3.5 py-2 text-sm font-bold transition ${view === "hoy" ? "bg-[#0057d9] text-white" : "ic-apagado bg-white/70"}`}
           >
             Hoy
           </button>
@@ -1839,6 +1843,9 @@ export default function AdminPanel() {
           <div className={view === "calendario" ? "block" : "hidden"}>
             <NativeCalendar />
           </div>
+        )}
+        {view === "hoy" && (
+          <TodayHome onNavigate={(target) => setView(target as typeof view)} />
         )}
         {view === "automatizaciones" && <AutomationCenter />}
         {view === "control" && <SystemControl />}
