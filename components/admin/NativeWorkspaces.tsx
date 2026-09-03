@@ -600,6 +600,7 @@ type OfficeOperationData = {
   diasPedidos?: number;
   diasConDato?: string[];
   diasSinDato?: string[];
+  diasFuturos?: string[];
   completo?: boolean;
   cobertura?: { desde: string; hasta: string; dias: number } | null;
   medidoMasViejo?: string;
@@ -1338,16 +1339,23 @@ function ControlTrendChart({
  * cuántos días está calculada. Si no hay ninguno, no se pinta ninguna cifra.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-function ultimoDiaDelMes(reference: Date) {
+/**
+ * El mes en curso, entero.
+ *
+ * ⚠️ No se recorta contra hoy, aunque la tentación era esa: quien decide que
+ * un día futuro NO falta por medir es la consola, en `opeAgregar_`, y en un
+ * solo sitio. Recortarlo aquí hacía que el selector del panel dejara de decir
+ * lo mismo que `opsRangoDe_` en el bot — y de eso avisó la prueba que compara
+ * las dos, día por día.
+ */
+function mesEnCurso(reference: Date) {
+  const dosDig = (n: number) => String(n).padStart(2, "0");
   const y = reference.getFullYear();
   const m = reference.getMonth();
-  const primero = `${y}-${String(m + 1).padStart(2, "0")}-01`;
   const siguiente =
-    m === 11
-      ? `${y + 1}-01-01T12:00:00Z`
-      : `${y}-${String(m + 2).padStart(2, "0")}-01T12:00:00Z`;
+    m === 11 ? `${y + 1}-01-01T12:00:00Z` : `${y}-${dosDig(m + 2)}-01T12:00:00Z`;
   return {
-    desde: primero,
+    desde: `${y}-${dosDig(m + 1)}-01`,
     hasta: new Date(Date.parse(siguiente) - 86400000).toISOString().slice(0, 10),
   };
 }
@@ -1369,7 +1377,7 @@ export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }
   const [control, setControl] = useState<ControlData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const rango = useMemo(() => ultimoDiaDelMes(new Date()), []);
+  const rango = useMemo(() => mesEnCurso(new Date()), []);
 
   const load = async () => {
     setLoading(true);
@@ -1452,7 +1460,7 @@ export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }
             <AlertTriangle size={19} className="mt-0.5 shrink-0 text-amber-700" />
             <div className="min-w-0">
               <p className="text-sm font-black text-amber-900">
-                Del mes faltan {faltan.length} de {operacion.diasPedidos} días por medir.
+                Faltan {faltan.length} de {operacion.diasPedidos} días del mes por medir.
               </p>
               <p className="mt-1 text-sm text-amber-800">
                 {medidos > 0
