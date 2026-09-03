@@ -1763,15 +1763,15 @@ export function SystemControl() {
         </article>
       )}
       <AttendanceControl />
-      <div className="overflow-hidden rounded-3xl bg-gradient-to-r from-slate-950 via-blue-950 to-cyan-900 text-white shadow-xl">
+      <div className="ic-marca overflow-hidden rounded-3xl shadow-xl">
         <LoadingBar active={loading} />
         <div className="flex flex-wrap items-center justify-between gap-5 p-6 md:p-8">
           <div>
-            <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[.2em] text-cyan-300">
+            <div className="ic-acento flex items-center gap-2 text-xs font-black uppercase tracking-[.2em]">
               <Bot size={17} /> Automatizaciones conectadas
             </div>
             <h3 className="mt-3 text-3xl font-black">Centro de control</h3>
-            <p className="mt-2 max-w-3xl text-sm text-cyan-100">
+            <p className="ic-sobre mt-2 max-w-3xl text-sm">
               Revisa todo el sistema y ejecuta los procesos existentes desde una
               sola pantalla. El bot conserva las mismas validaciones y confirma
               por Telegram.
@@ -1935,20 +1935,20 @@ export function SystemControl() {
       </article>
 
       <article className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
-        <div className="border-b border-slate-100 bg-gradient-to-r from-cyan-950 via-blue-950 to-blue-800 p-5 text-white md:p-6">
+        <div className="border-b border-slate-100 bg-[#f3f6fc] p-5 md:p-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-start gap-3">
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/10 text-cyan-200">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#0057d9] text-white">
                 <FolderOpen size={21} />
               </span>
               <div>
-                <p className="text-[11px] font-black uppercase tracking-[.18em] text-cyan-300">
+                <p className="text-[11px] font-black uppercase tracking-[.18em] text-[#0057d9]">
                   Entrada Karla
                 </p>
-                <h4 className="mt-1 text-2xl font-black">
+                <h4 className="mt-1 text-2xl font-black text-slate-950">
                   Qué archivos hay que subir
                 </h4>
-                <p className="mt-1 max-w-2xl text-sm text-blue-100">
+                <p className="mt-1 max-w-2xl text-sm text-slate-600">
                   Cuatro reportes alimentan el bot. Cada tarjeta dice de dónde
                   sale, cómo exportarlo y si ya está al día.
                 </p>
@@ -1959,7 +1959,7 @@ export function SystemControl() {
                 href={data.carpetaReportesUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-black text-blue-950 shadow-lg transition hover:-translate-y-0.5"
+                className="inline-flex items-center gap-2 rounded-xl bg-[#0057d9] px-4 py-3 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5"
               >
                 <FolderOpen size={17} /> Abrir Entrada Karla{" "}
                 <ExternalLink size={14} />
@@ -2355,11 +2355,11 @@ export function NativeConsole() {
   const busy = Object.values(loading).some(Boolean);
   return (
     <section className="mt-6 space-y-6">
-      <div className="overflow-hidden rounded-3xl bg-gradient-to-r from-slate-950 via-blue-950 to-blue-800 text-white shadow-xl">
+      <div className="ic-marca overflow-hidden rounded-3xl shadow-xl">
         <LoadingBar active={busy} />
         <div className="flex flex-wrap items-center justify-between gap-5 p-6 md:p-8">
           <div>
-            <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[.2em] text-blue-300">
+            <div className="ic-acento flex items-center gap-2 text-xs font-black uppercase tracking-[.2em]">
               <ShieldCheck size={16} /> Centro operativo en vivo
             </div>
             <h3 className="mt-3 text-3xl font-black">Consola Intercoast</h3>

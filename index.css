@@ -263,3 +263,29 @@ textarea {
   font-feature-settings: "tnum" 1;
   letter-spacing: -.01em;
 }
+
+/**
+ * El bloque de marca: la misma pieza que el riel, para las cabeceras oscuras.
+ *
+ * ⚠️ Dentro de Control había TRES degradados grandes y ninguno era el azul de
+ * Intercoast: dos tiraban a cian y competían con el riel. Una sola definición
+ * aquí en vez de tres cadenas de utilidades distintas repartidas por el
+ * fichero — cambiar el azul de la casa no puede exigir buscarlo en tres sitios.
+ */
+.ic-marca {
+  background: linear-gradient(112deg, var(--ic-azul-hondo) 0%, var(--ic-azul) 72%);
+  position: relative;
+  color: #fff;
+}
+.ic-marca::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 92% 12%, rgba(255, 193, 7, .22), transparent 46%);
+}
+.ic-marca > * { position: relative; }
+
+/* El acento de esas cabeceras es el dorado de la marca, no un cian suelto. */
+.ic-marca .ic-acento { color: #ffd65c; }
+.ic-marca .ic-sobre { color: rgba(255, 255, 255, .82); }
