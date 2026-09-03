@@ -115,3 +115,104 @@ textarea {
     padding-bottom: 0;
   }
 }
+
+/* ═══ El armazón del centro de operaciones ═══════════════════════════════════
+ *
+ * El panel tenía diez pestañas planas sobre gris claro: nada pesaba más que
+ * nada. Esto le da riel de marca a la izquierda, navegación agrupada por
+ * CUÁNDO se usa cada cosa, y un lienzo con tono propio.
+ *
+ * ⚠️ Va aquí y no en clases sueltas de Tailwind a propósito: el tema oscuro del
+ * panel ya vive en este archivo, y mezclar los dos sitios es como se llegó a la
+ * pila de `!important` de arriba. Cada color del armazón tiene su pareja clara
+ * y oscura declarada junta.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.admin-shell {
+  --ic-azul: #0057d9;
+  --ic-azul-hondo: #00379B;
+  --ic-oro: #ffc107;
+  --ic-lienzo: #eef2f9;
+  --ic-superficie: #ffffff;
+  --ic-borde: #dbe3f0;
+  --ic-tinta: #0e1a2e;
+  --ic-tinta-suave: #6b7a94;
+}
+
+.admin-shell.dark {
+  --ic-azul: #1f6feb;
+  --ic-azul-hondo: #0b2f6b;
+  --ic-lienzo: #070d1a;
+  --ic-superficie: #101827;
+  --ic-borde: #243148;
+  --ic-tinta: #f2f6fc;
+  --ic-tinta-suave: #8fa0bd;
+}
+
+/* El riel. Conserva el azul de la marca en los dos temas: es la identidad, no
+   una decoración que dependa de la luz. */
+.ic-riel {
+  background: linear-gradient(178deg, var(--ic-azul) 0%, var(--ic-azul-hondo) 100%);
+  position: relative;
+}
+.ic-riel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 88% 5%, rgba(255, 193, 7, .20), transparent 42%);
+}
+.ic-riel > * { position: relative; }
+
+.ic-grupo {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, .5);
+  padding: 0 10px 6px;
+}
+
+.ic-enlace {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, .86);
+  text-align: left;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+.ic-enlace:hover { background: rgba(255, 255, 255, .1); color: #fff; }
+
+.ic-enlace[aria-current="page"] {
+  background: #fff;
+  color: var(--ic-azul-hondo);
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0, 32, 90, .22);
+}
+.admin-shell.dark .ic-enlace[aria-current="page"] {
+  background: #f2f6fc;
+  color: #0b2f6b;
+}
+
+.ic-insignia {
+  margin-left: auto;
+  font-size: 10.5px;
+  font-weight: 600;
+  background: var(--ic-oro);
+  color: var(--ic-azul-hondo);
+  padding: 1.5px 6px;
+  border-radius: 5px;
+}
+
+.ic-lienzo { background: var(--ic-lienzo); }
+.ic-barra {
+  background: var(--ic-superficie);
+  border-bottom: 1px solid var(--ic-borde);
+}
+.ic-titulo { color: var(--ic-tinta); }
+.ic-apagado { color: var(--ic-tinta-suave); }

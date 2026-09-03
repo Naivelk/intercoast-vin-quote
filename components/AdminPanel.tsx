@@ -25,11 +25,15 @@ import {
   Activity,
   Bot,
   BriefcaseBusiness,
+  CalendarDays,
   History,
   Moon,
   Search,
+  ShieldCheck,
   Sparkles,
   Sun,
+  WalletCards,
+  Zap,
 } from "lucide-react";
 
 const ALLOWED = new Set([
@@ -1314,21 +1318,132 @@ export default function AdminPanel() {
   const urgentCases = (retention?.cases || []).filter(
     (item) => Number(item.Prioridad || item.Score || item.score || 0) >= 90,
   ).length;
+  /* ═══ LA NAVEGACIÓN, AGRUPADA POR CUÁNDO SE USA ═══
+   *
+   * Eran diez pestañas planas, y `Auditoría` pesaba lo mismo que
+   * `Casos de hoy` — una se mira una vez al mes y la otra cada mañana.
+   *
+   * ⚠️ **No se renombra ni se elimina ninguna vista.** Los diez destinos
+   * siguen existiendo con su mismo `view`; lo único que cambia es cómo se
+   * agrupan. Un cambio de navegación que además mueve funcionalidad es dos
+   * cambios, y cuando algo falla no se sabe cuál de los dos fue.
+   */
+  const GRUPOS: Array<{
+    grupo: string;
+    cuando: string;
+    items: Array<{ id: typeof view; label: string; icon: React.ReactNode; badge?: number }>;
+  }> = [
+    {
+      grupo: "El día",
+      cuando: "cada mañana",
+      items: [
+        { id: "trabajo", label: "Casos de hoy", icon: <BriefcaseBusiness size={16} /> },
+        { id: "calendario", label: "Calendario", icon: <CalendarDays size={16} /> },
+        { id: "leads", label: "Leads", icon: <Sparkles size={16} />, badge: unassigned },
+      ],
+    },
+    {
+      grupo: "Dinero",
+      cuando: "lo que más se mira",
+      items: [
+        { id: "consola", label: "Cartera y clientes", icon: <Search size={16} /> },
+        { id: "zelle", label: "Zelle de agentes", icon: <WalletCards size={16} /> },
+      ],
+    },
+    {
+      grupo: "El sistema",
+      cuando: "cuando algo falla",
+      items: [
+        { id: "control", label: "Control del bot", icon: <Bot size={16} /> },
+        { id: "automatizaciones", label: "Automatizaciones", icon: <Zap size={16} /> },
+        { id: "diagnosticos", label: "Salud", icon: <Activity size={16} /> },
+        { id: "auditoria", label: "Auditoría", icon: <History size={16} /> },
+      ],
+    },
+  ];
+
   const navigateToLead = (lead: Lead) => {
     setSelected(lead);
     setView("leads");
   };
+  const TITULOS: Record<string, { titulo: string; bajada: string }> = {
+    resumen: { titulo: "Hoy", bajada: "Lo que entró, lo que falta y quién está trabajando" },
+    trabajo: { titulo: "Casos de hoy", bajada: "La agenda priorizada de los seis calendarios" },
+    leads: { titulo: "Leads", bajada: "Lo que entra por la web y por la radio" },
+    consola: { titulo: "Cartera y clientes", bajada: "Buscador, pólizas y dinero del día" },
+    zelle: { titulo: "Zelle de agentes", bajada: "Lo que entra por transferencia" },
+    calendario: { titulo: "Calendario", bajada: "Los seis calendarios de la oficina" },
+    control: { titulo: "Control del bot", bajada: "Procesos, activadores y órdenes manuales" },
+    automatizaciones: { titulo: "Automatizaciones", bajada: "Lo que corre solo" },
+    diagnosticos: { titulo: "Salud", bajada: "Si los números están vivos" },
+    auditoria: { titulo: "Auditoría", bajada: "Qué se hizo y cuándo" },
+  };
+  const cabecera = TITULOS[view] || { titulo: "Centro de operaciones", bajada: "" };
+
   return (
     <main
-      className={`admin-shell min-h-screen bg-slate-100 ${theme === "dark" ? "dark" : ""}`}
+      className={`admin-shell ic-lienzo flex min-h-screen ${theme === "dark" ? "dark" : ""}`}
     >
-      <header className="admin-header sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-4 px-4 py-4 md:px-8">
-          <div>
-            <p className="text-[11px] font-extrabold uppercase tracking-[.16em] text-blue-700">
-              Intercoast Insurance
-            </p>
-            <h1 className="text-xl font-black">Centro de operaciones</h1>
+      {/* ═══ RIEL DE MARCA ═══ */}
+      <aside className="ic-riel sticky top-0 hidden h-screen w-[236px] shrink-0 flex-col text-white lg:flex">
+        <div className="px-5 pb-5 pt-6">
+          <div className="flex items-center gap-2.5">
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-[#ffc107]">
+              <ShieldCheck size={17} className="text-[#00379B]" />
+            </span>
+            <span>
+              <span className="block text-sm font-bold leading-tight">Intercoast</span>
+              <span className="block text-[9.5px] font-medium uppercase tracking-[.1em] text-white/60">
+                Operaciones
+              </span>
+            </span>
+          </div>
+        </div>
+
+        <nav aria-label="Secciones del panel" className="flex flex-1 flex-col gap-4 overflow-y-auto px-3 pb-3">
+          <button
+            onClick={() => setView("resumen")}
+            aria-current={view === "resumen" ? "page" : undefined}
+            className="ic-enlace"
+          >
+            <Activity size={16} /> Hoy
+          </button>
+
+          {GRUPOS.map((seccion) => (
+            <div key={seccion.grupo} className="flex flex-col gap-0.5">
+              <p className="ic-grupo" title={seccion.cuando}>
+                {seccion.grupo}
+              </p>
+              {seccion.items.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setView(item.id)}
+                  aria-current={view === item.id ? "page" : undefined}
+                  className="ic-enlace"
+                >
+                  {item.icon}
+                  <span className="truncate">{item.label}</span>
+                  {item.badge ? <span className="ic-insignia">{item.badge}</span> : null}
+                </button>
+              ))}
+            </div>
+          ))}
+        </nav>
+
+        <div className="border-t border-white/15 px-5 py-4">
+          <p className="truncate text-xs font-semibold">{user}</p>
+          <p className="text-[10.5px] text-white/60">Espacio privado</p>
+        </div>
+      </aside>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+      <header className="admin-header ic-barra sticky top-0 z-40 backdrop-blur-xl">
+        <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-4 md:px-7">
+          <div className="min-w-0">
+            <h1 className="ic-titulo truncate text-xl font-black tracking-[-.02em]">
+              {cabecera.titulo}
+            </h1>
+            <p className="ic-apagado truncate text-[11.5px]">{cabecera.bajada}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
@@ -1380,121 +1495,29 @@ export default function AdminPanel() {
           </div>
         </div>
       </header>
-      <div className="mx-auto max-w-[1600px] px-4 py-7 md:px-8">
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="mb-1 text-xs font-bold uppercase tracking-widest text-blue-700">
-              Espacio privado · {user}
-            </p>
-            <h2 className="text-3xl font-black">
-              {view === "resumen"
-                ? "Resumen comercial"
-                : view === "trabajo"
-                  ? "Centro de trabajo"
-                : view === "leads"
-                  ? "Gestión de leads"
-                  : view === "consola"
-                    ? "Consola operativa"
-                    : view === "zelle"
-                      ? "Zelle de agentes"
-                      : view === "calendario"
-                        ? "Calendarios de la oficina"
-                        : view === "control"
-                          ? "Centro de control"
-                        : view === "diagnosticos"
-                          ? "Salud de automatizaciones"
-                        : view === "auditoria"
-                          ? "Historial de actividad"
-                        : "Automatizaciones"}
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              {view === "resumen"
-                ? "Lo más importante de la oficina, en una sola mirada."
-                : view === "trabajo"
-                  ? "Prioridades reales de leads y retención listas para trabajar."
-                : view === "leads"
-                  ? "Busca, actualiza y da seguimiento sin perder oportunidades."
-                  : view === "consola"
-                    ? "La aplicación completa de tu papá, funcionando dentro del panel."
-                    : view === "zelle"
-                      ? "La interfaz morada original con los pagos y controles de los agentes."
-                      : view === "calendario"
-                        ? "Todos los calendarios y la agenda priorizada en una sola vista."
-                        : view === "control"
-                          ? "Comprueba la salud de todos los procesos y ejecútalos manualmente desde un solo lugar."
-                        : view === "diagnosticos"
-                          ? "Ejecuta revisiones reales y seguras de Sentry, renovaciones, riesgo y Callbright."
-                        : view === "auditoria"
-                          ? "Consulta quién cambió qué y cuándo desde este panel."
-                        : "Conoce cada proceso antes de abrir o modificar sus scripts."}
-            </p>
-          </div>
-          <nav
-            aria-label="Secciones del panel"
-            className="flex max-w-full gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm"
+      <div className="flex-1 px-4 py-6 md:px-7">
+        {/* En pantallas estrechas no hay riel: la misma navegación, en fila.
+            Mismos destinos y mismo orden — no es otro menú. */}
+        <nav
+          aria-label="Secciones del panel"
+          className="mb-5 flex gap-1.5 overflow-x-auto lg:hidden"
+        >
+          <button
+            onClick={() => setView("resumen")}
+            className={`whitespace-nowrap rounded-xl px-3.5 py-2 text-sm font-bold transition ${view === "resumen" ? "bg-[#0057d9] text-white" : "ic-apagado bg-white/70"}`}
           >
+            Hoy
+          </button>
+          {GRUPOS.flatMap((seccion) => seccion.items).map((item) => (
             <button
-              onClick={() => setView("trabajo")}
-              className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-bold transition ${view === "trabajo" ? "bg-blue-700 text-white shadow-md shadow-blue-200" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}
+              key={item.id}
+              onClick={() => setView(item.id)}
+              className={`whitespace-nowrap rounded-xl px-3.5 py-2 text-sm font-bold transition ${view === item.id ? "bg-[#0057d9] text-white" : "ic-apagado bg-white/70"}`}
             >
-              <BriefcaseBusiness size={15} /> Trabajo
+              {item.label}
             </button>
-            <button
-              onClick={() => setView("resumen")}
-              className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-bold transition ${view === "resumen" ? "bg-blue-700 text-white shadow-md shadow-blue-200" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}
-            >
-              ◫ Resumen
-            </button>
-            <button
-              onClick={() => setView("leads")}
-              className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-bold transition ${view === "leads" ? "bg-blue-700 text-white shadow-md shadow-blue-200" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}
-            >
-              ◎ Leads
-            </button>
-            <button
-              onClick={() => setView("control")}
-              className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-bold transition ${view === "control" ? "bg-cyan-800 text-white shadow-md shadow-cyan-200" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}
-            >
-              <Bot size={15} /> Control
-            </button>
-            <button
-              onClick={() => setView("consola")}
-              className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-bold transition ${view === "consola" ? "bg-blue-700 text-white shadow-md shadow-blue-200" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}
-            >
-              ◈ Consola
-            </button>
-            <button
-              onClick={() => setView("zelle")}
-              className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-bold transition ${view === "zelle" ? "bg-violet-700 text-white shadow-md shadow-violet-200" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}
-            >
-              $ Zelle
-            </button>
-            <button
-              onClick={() => setView("calendario")}
-              className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-bold transition ${view === "calendario" ? "bg-blue-700 text-white shadow-md shadow-blue-200" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}
-            >
-              □ Calendario
-            </button>
-            <button
-              onClick={() => setView("automatizaciones")}
-              className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-bold transition ${view === "automatizaciones" ? "bg-blue-700 text-white shadow-md shadow-blue-200" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}
-            >
-              ⚡ Automatizaciones
-            </button>
-            <button
-              onClick={() => setView("diagnosticos")}
-              className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-bold transition ${view === "diagnosticos" ? "bg-cyan-700 text-white shadow-md shadow-cyan-200" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}
-            >
-              <Activity size={15} /> Salud
-            </button>
-            <button
-              onClick={() => setView("auditoria")}
-              className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-bold transition ${view === "auditoria" ? "bg-blue-700 text-white shadow-md shadow-blue-200" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}
-            >
-              <History size={15} /> Auditoría
-            </button>
-          </nav>
-        </div>
+          ))}
+        </nav>
         {message && (
           <p className="mb-5 rounded-xl bg-blue-50 p-3 text-sm text-blue-800">
             {message}
@@ -1823,6 +1846,7 @@ export default function AdminPanel() {
         {view === "auditoria" && (
           <AuditPanel entries={auditEntries} loading={auditLoading} />
         )}
+      </div>
       </div>
       <GlobalSearch
         open={searchOpen}

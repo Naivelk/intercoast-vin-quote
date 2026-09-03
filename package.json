@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck:admin": "tsc --noEmit -p tsconfig.admin.json"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.7",

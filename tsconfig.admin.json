@@ -1,0 +1,20 @@
+{
+  "// por qué existe": [
+    "El `tsconfig.json` del proyecto tiene `include: [\"src\"]`, y el panel de",
+    "administración NO vive en `src/` sino en `components/`. Es decir: durante",
+    "todo este tiempo `npx tsc -p tsconfig.json` ha dado verde sin mirar el",
+    "panel. Se descubrió el 2 de septiembre de 2026, cuando cuatro iconos sin",
+    "importar pasaron el typecheck Y el build, y solo habrían reventado en el",
+    "navegador del manager.",
+    "",
+    "Esto comprueba el panel entero. Se queda en verde, que es la condición",
+    "para que alguien lo mire: un chequeo que nadie puede poner en verde se",
+    "acaba ignorando.",
+    "",
+    "Incluir la aplicación COMPLETA da hoy 7 errores previos en 4 ficheros",
+    "-PolicyModal.tsx, QuoteFormReact.tsx, chatbot.hooks.ts y",
+    "pricing/sharedRateConfig.ts-. No son del panel y no se tocaron."
+  ],
+  "extends": "./tsconfig.json",
+  "include": ["components/AdminPanel.tsx", "components/admin", "netlify/functions"]
+}
