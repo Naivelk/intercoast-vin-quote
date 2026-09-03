@@ -23,6 +23,9 @@ const CACHE_TTL = {
   "consola:inventarioCorreo": 10 * 60 * 1000,
   "consola:centroControl": 5 * 1000,
   "consola:resumenAsistencia": 15 * 1000,
+  // La pestaña la publica el bot y no se mueve sola: no hace falta
+  // preguntarla cada vez. Diez minutos, como las demás lecturas quietas.
+  "consola:operacionPorOficina": 10 * 60 * 1000,
   "zelle:datos": 2 * 60 * 1000,
 };
 
@@ -54,6 +57,7 @@ export default async (request) => {
           "centroControl",
           "resumenAsistencia",
           "solicitarControl",
+          "operacionPorOficina",
         ]),
         zelle: new Set(["datos", "actualizar"]),
       };
