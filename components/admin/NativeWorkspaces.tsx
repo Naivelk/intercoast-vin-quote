@@ -575,6 +575,349 @@ const ATTENDANCE_PERIODS: Array<{ id: AttendancePeriod; label: string }> = [
   { id: "mes", label: "Mes" },
 ];
 
+type OfficeOperationOffice = {
+  oficina: string;
+  dias: string[];
+  diasParciales: string[];
+  fiduciary: number;
+  apps: number;
+  endos: number;
+  ccNum: number;
+  ccMonto: number;
+  deposit: number;
+  desgloseApps:
+    | { disponible: true; nb: number; rw: number }
+    | { disponible: false; motivo: string; dias: string[] };
+};
+
+type OfficeOperationData = {
+  ok: boolean;
+  publicada?: boolean;
+  error?: string;
+  desde?: string;
+  hasta?: string;
+  oficinas?: OfficeOperationOffice[];
+  diasPedidos?: number;
+  diasConDato?: string[];
+  diasSinDato?: string[];
+  completo?: boolean;
+  medidoMasViejo?: string;
+  parciales?: string[];
+};
+
+type OperationPeriod = "dia" | "semana" | "mes";
+
+const OPERATION_PERIODS: Array<{ id: OperationPeriod; label: string }> = [
+  { id: "dia", label: "Día" },
+  { id: "semana", label: "Semana" },
+  { id: "mes", label: "Mes" },
+];
+
+/**
+ * Del selector al rango de fechas.
+ *
+ * ⚠️ La definición canónica vive en `opsRangoDe_`, en el proyecto del bot
+ * (`gas/operacion-oficina.js`). Esta es la única otra copia y **tiene que decir
+ * lo mismo**: la semana empieza en LUNES, como el cuadre y la nómina. Dos
+ * semanas distintas en el mismo tablero serían dos verdades.
+ *
+ * La aritmética va sobre el mediodía UTC para que el cambio de horario de
+ * California no corra la fecha un día entero, igual que allá.
+ */
+function operationRange(period: OperationPeriod, reference: Date) {
+  const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
+  const base = Date.parse(
+    `${reference.getFullYear()}-${String(reference.getMonth() + 1).padStart(2, "0")}-${String(
+      reference.getDate(),
+    ).padStart(2, "0")}T12:00:00Z`,
+  );
+  if (period === "dia") return { desde: iso(base), hasta: iso(base) };
+  if (period === "mes") {
+    const y = reference.getFullYear();
+    const m = reference.getMonth();
+    const primero = Date.parse(
+      `${y}-${String(m + 1).padStart(2, "0")}-01T12:00:00Z`,
+    );
+    const siguiente = Date.parse(
+      m === 11
+        ? `${y + 1}-01-01T12:00:00Z`
+        : `${y}-${String(m + 2).padStart(2, "0")}-01T12:00:00Z`,
+    );
+    return { desde: iso(primero), hasta: iso(siguiente - 86400000) };
+  }
+  const dow = new Date(base).getUTCDay();
+  const atras = dow === 0 ? 6 : dow - 1;
+  const lunes = base - atras * 86400000;
+  return { desde: iso(lunes), hasta: iso(lunes + 6 * 86400000) };
+}
+
+/**
+ * OPERACIÓN POR OFICINA
+ *
+ * ═══ LO QUE ESTA TARJETA TIENE QUE HACER BIEN ═══
+ *
+ * Pintar la ausencia **como ausencia**. Un día que nadie ha medido no puede
+ * verse igual que un día sin ventas, y ninguno de los dos puede verse como un
+ * cero: un cero en un tablero no se cuestiona, se resta y se lleva a una
+ * reunión. Por eso:
+ *
+ *   · si al rango le faltan días, se dice **arriba y en grande**, y cada cifra
+ *     lleva sobre cuántos días está calculada;
+ *   · si no hay ni un día medido, **no se pinta ninguna cifra**;
+ *   · si el desglose NB/REWRITE no se sostiene, se escribe «sin desglose» con
+ *     su motivo — nunca `0 / 0`;
+ *   · un día que llegó a medias se marca, aunque sus números estén ahí.
+ *
+ * Solo lee. Los números salen de la pestaña que publica el bot.
+ */
+function OfficeOperation() {
+  const [period, setPeriod] = useState<OperationPeriod>("dia");
+  const [data, setData] = useState<OfficeOperationData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const range = useMemo(() => operationRange(period, new Date()), [period]);
+
+  const load = async (selected = range) => {
+    setLoading(true);
+    try {
+      const value = await callTool<OfficeOperationData>(
+        "consola",
+        "operacionPorOficina",
+        [selected.desde, selected.hasta],
+      );
+      if (!value.ok)
+        throw new Error(
+          value.error === "error-interno"
+            ? "La consola no pudo leer la pestaña."
+            : value.error || "No se pudo leer la operación.",
+        );
+      setData(value);
+      setError("");
+    } catch (reason) {
+      setData(null);
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "No se pudo leer la operación por oficina.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load(range);
+  }, [range.desde, range.hasta]);
+
+  const oficinas = data?.oficinas || [];
+  const faltan = data?.diasSinDato || [];
+  const medidos = data?.diasConDato?.length || 0;
+
+  return (
+    <article className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
+      <LoadingBar active={loading} />
+      <div className="border-b border-slate-100 p-5 md:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-blue-50 text-blue-700">
+              <FileSpreadsheet size={21} />
+            </span>
+            <div>
+              <h3 className="text-2xl font-black text-slate-950">
+                Operación por oficina
+              </h3>
+              <p className="mt-1 text-sm text-slate-500">
+                Lo que entró por oficina según Sentry. Sale de la pestaña que
+                publica el bot; no se recalcula aquí.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => void load(range)}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-800 hover:border-blue-300 hover:bg-blue-50 disabled:opacity-60"
+          >
+            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />{" "}
+            Actualizar
+          </button>
+        </div>
+        <div className="mt-5 flex flex-wrap items-center gap-4">
+          <div className="inline-flex rounded-xl bg-slate-100 p-1">
+            {OPERATION_PERIODS.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setPeriod(item.id)}
+                className={`rounded-lg px-4 py-2 text-sm font-black transition ${period === item.id ? "bg-white text-blue-700 shadow-sm" : "text-slate-500 hover:text-slate-900"}`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <span className="text-xs font-semibold text-slate-500">
+            {range.desde === range.hasta
+              ? range.desde
+              : `${range.desde} → ${range.hasta}`}
+          </span>
+        </div>
+      </div>
+
+      {error && (
+        <div className="m-5 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-800">
+          {error}
+        </div>
+      )}
+
+      {!error && data && data.publicada === false && (
+        <div className="m-5 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+          <p className="text-sm font-black text-slate-800">
+            El bot todavía no ha publicado esta pestaña.
+          </p>
+          <p className="mt-1 text-sm text-slate-600">
+            No hay nada medido que mostrar. Se llena corriendo{" "}
+            <code className="rounded bg-white px-1.5 py-0.5 text-xs">
+              apiPublicarOperacion
+            </code>
+            ; todavía no tiene activador.
+          </p>
+        </div>
+      )}
+
+      {/* ⚠️ Lo que falta, arriba y en grande. Si esto se pinta pequeño o se
+          omite, las cifras de abajo se leen como el total del periodo. */}
+      {!error && data?.publicada !== false && faltan.length > 0 && (
+        <div className="m-5 rounded-2xl border border-amber-300 bg-amber-50 p-5">
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={20} className="mt-0.5 shrink-0 text-amber-700" />
+            <div>
+              <p className="text-sm font-black text-amber-900">
+                Faltan {faltan.length} de {data?.diasPedidos ?? faltan.length}{" "}
+                días por medir.
+              </p>
+              <p className="mt-1 text-sm text-amber-800">
+                Las cifras de abajo son de los {medidos} días que sí están
+                medidos, no del periodo entero.{" "}
+                <span className="font-semibold">
+                  Un día sin fila puede ser un día sin ventas o un día que nadie
+                  ha medido: desde aquí no se distinguen.
+                </span>
+              </p>
+              <p className="mt-2 font-mono text-xs text-amber-800">
+                {faltan.slice(0, 12).join("  ")}
+                {faltan.length > 12 ? `  …y ${faltan.length - 12} más` : ""}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="p-5 md:p-6">
+        {/* Sin ningún día medido no se pinta ni una cifra: un cero aquí sería
+            una afirmación que nadie ha comprobado. */}
+        {!error && data?.publicada !== false && oficinas.length === 0 && (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+            <p className="text-sm font-black text-slate-700">
+              No hay ningún día medido en este periodo.
+            </p>
+            <p className="mt-1 text-sm text-slate-500">
+              No se muestran cifras porque no las hay — no porque valgan cero.
+            </p>
+          </div>
+        )}
+
+        <div className="grid gap-5 xl:grid-cols-2">
+          {oficinas.map((office) => {
+            const parcial = office.diasParciales.length > 0;
+            return (
+              <section
+                key={office.oficina}
+                className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h4 className="text-lg font-black text-slate-950">
+                    {office.oficina}
+                  </h4>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-black text-slate-600">
+                      {office.dias.length}{" "}
+                      {office.dias.length === 1 ? "día" : "días"}
+                    </span>
+                    {parcial && (
+                      <span className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-black text-amber-800">
+                        {office.diasParciales.length} a medias
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <Metric
+                    label="Fiduciary"
+                    value={moneyExact(office.fiduciary)}
+                    hint={`sobre ${office.dias.length} días medidos`}
+                  />
+                  <Metric
+                    label="Deposit calculado"
+                    value={moneyExact(office.deposit)}
+                    hint="lo que le corresponde rendir"
+                    tone="green"
+                  />
+                  <Metric
+                    label="Aplicaciones"
+                    value={office.apps}
+                    hint={
+                      office.desgloseApps.disponible
+                        ? `${office.desgloseApps.nb} NB · ${office.desgloseApps.rw} REWRITE`
+                        : "sin desglose NB/REWRITE"
+                    }
+                    tone="violet"
+                  />
+                  <Metric
+                    label="Endosos"
+                    value={office.endos}
+                    hint={`${office.ccNum} tarjetas · ${moneyExact(office.ccMonto)}`}
+                    tone="amber"
+                  />
+                </div>
+
+                {/* El desglose que no se sostiene se escribe, nunca se pinta
+                    como 0 / 0: sumar los días que sí lo traen daría una cifra
+                    con pinta de total del periodo que es de un trozo. */}
+                {!office.desgloseApps.disponible && (
+                  <p className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+                    <span className="font-black text-slate-800">
+                      Sin desglose NB/REWRITE.
+                    </span>{" "}
+                    Falta en {office.desgloseApps.dias.length}{" "}
+                    {office.desgloseApps.dias.length === 1 ? "día" : "días"} del
+                    periodo, así que sumarlo daría un total de un trozo. Las
+                    aplicaciones sí están validadas.
+                  </p>
+                )}
+
+                {parcial && (
+                  <p className="mt-2 text-xs text-amber-800">
+                    Días a medias: {office.diasParciales.join(", ")}. El último
+                    día del rango de un reporte llega incompleto.
+                  </p>
+                )}
+              </section>
+            );
+          })}
+        </div>
+
+        {data?.medidoMasViejo && (
+          <p className="mt-5 text-xs text-slate-500">
+            El número más antiguo de este periodo se midió el{" "}
+            {data.medidoMasViejo} (California). No es la hora de la última
+            corrida: es desde cuándo ese número es ese.
+          </p>
+        )}
+      </div>
+    </article>
+  );
+}
+
 function AttendanceControl() {
   const [period, setPeriod] = useState<AttendancePeriod>("hoy");
   const [data, setData] = useState<AttendanceData | null>(null);
@@ -1075,6 +1418,7 @@ export function SystemControl() {
           </div>
         </article>
       )}
+      <OfficeOperation />
       <AttendanceControl />
       <div className="overflow-hidden rounded-3xl bg-gradient-to-r from-slate-950 via-blue-950 to-cyan-900 text-white shadow-xl">
         <LoadingBar active={loading} />
