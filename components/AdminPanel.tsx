@@ -11,6 +11,7 @@ import {
   NativeCalendar,
   NativeConsole,
   NativeZelle,
+  OfficeOperation,
   SystemControl,
   TodayHome,
 } from "./admin/NativeWorkspaces";
@@ -27,6 +28,7 @@ import {
   Bot,
   BriefcaseBusiness,
   CalendarDays,
+  FileSpreadsheet,
   History,
   Moon,
   Search,
@@ -981,6 +983,7 @@ export default function AdminPanel() {
   const [message, setMessage] = useState("");
   const [view, setView] = useState<
     | "hoy"
+    | "operacion"
     | "trabajo"
     | "resumen"
     | "leads"
@@ -1349,6 +1352,7 @@ export default function AdminPanel() {
       grupo: "Dinero",
       cuando: "lo que más se mira",
       items: [
+        { id: "operacion", label: "Operación por oficina", icon: <FileSpreadsheet size={16} /> },
         { id: "consola", label: "Cartera y clientes", icon: <Search size={16} /> },
         { id: "zelle", label: "Zelle de agentes", icon: <WalletCards size={16} /> },
       ],
@@ -1371,6 +1375,10 @@ export default function AdminPanel() {
   };
   const TITULOS: Record<string, { titulo: string; bajada: string }> = {
     hoy: { titulo: "Hoy", bajada: "Lo que entró, lo que falta y quién está trabajando" },
+    operacion: {
+      titulo: "Operación por oficina",
+      bajada: "Lo que entró por oficina según Sentry, por día, semana o mes",
+    },
     resumen: { titulo: "Resumen comercial", bajada: "El embudo de leads y su avance" },
     trabajo: { titulo: "Casos de hoy", bajada: "La agenda priorizada de los seis calendarios" },
     leads: { titulo: "Leads", bajada: "Lo que entra por la web y por la radio" },
@@ -1847,6 +1855,7 @@ export default function AdminPanel() {
         {view === "hoy" && (
           <TodayHome onNavigate={(target) => setView(target as typeof view)} />
         )}
+        {view === "operacion" && <OfficeOperation />}
         {view === "automatizaciones" && <AutomationCenter />}
         {view === "control" && <SystemControl />}
         {view === "diagnosticos" && <DiagnosticsPanel />}

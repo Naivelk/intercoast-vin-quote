@@ -672,7 +672,7 @@ function operationRange(period: OperationPeriod, reference: Date) {
  *
  * Solo lee. Los números salen de la pestaña que publica el bot.
  */
-function OfficeOperation() {
+export function OfficeOperation() {
   const [period, setPeriod] = useState<OperationPeriod>("dia");
   const [reference, setReference] = useState<Date>(() => new Date());
   const [data, setData] = useState<OfficeOperationData | null>(null);
@@ -1483,13 +1483,24 @@ export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }
               {rango.desde} → {rango.hasta} · lo que entró según Sentry
             </p>
           </div>
-          <button
-            onClick={() => void load()}
-            disabled={loading}
-            className="ml-auto inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-800 hover:border-blue-300 hover:bg-blue-50 disabled:opacity-60"
-          >
-            <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> Actualizar
-          </button>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {/* Del resumen al detalle: la portada da el mes, y ahí se puede
+                bajar a la semana y al día. */}
+            <button
+              onClick={() => onNavigate("operacion")}
+              className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-black text-blue-700 hover:bg-blue-50"
+            >
+              Ver por día y semana
+              <ChevronRight size={16} />
+            </button>
+            <button
+              onClick={() => void load()}
+              disabled={loading}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-800 hover:border-blue-300 hover:bg-blue-50 disabled:opacity-60"
+            >
+              <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> Actualizar
+            </button>
+          </div>
         </div>
 
         {!loading && !oficinas.length ? (
@@ -1589,7 +1600,7 @@ export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }
       <section className="grid gap-3 sm:grid-cols-3">
         {[
           { id: "trabajo", label: "Casos de hoy", hint: "la agenda priorizada" },
-          { id: "control", label: "Control del bot", hint: "procesos y órdenes" },
+          { id: "consola", label: "Cartera y clientes", hint: "buscador y pólizas" },
           { id: "zelle", label: "Zelle de agentes", hint: "lo que entra por transferencia" },
         ].map((atajo) => (
           <button
@@ -1751,7 +1762,6 @@ export function SystemControl() {
           </div>
         </article>
       )}
-      <OfficeOperation />
       <AttendanceControl />
       <div className="overflow-hidden rounded-3xl bg-gradient-to-r from-slate-950 via-blue-950 to-cyan-900 text-white shadow-xl">
         <LoadingBar active={loading} />
