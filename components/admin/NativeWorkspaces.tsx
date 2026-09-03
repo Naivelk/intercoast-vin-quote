@@ -601,6 +601,7 @@ type OfficeOperationData = {
   diasConDato?: string[];
   diasSinDato?: string[];
   completo?: boolean;
+  cobertura?: { desde: string; hasta: string; dias: number } | null;
   medidoMasViejo?: string;
   parciales?: string[];
 };
@@ -672,11 +673,15 @@ function operationRange(period: OperationPeriod, reference: Date) {
  */
 function OfficeOperation() {
   const [period, setPeriod] = useState<OperationPeriod>("dia");
+  const [reference, setReference] = useState<Date>(() => new Date());
   const [data, setData] = useState<OfficeOperationData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const range = useMemo(() => operationRange(period, new Date()), [period]);
+  const range = useMemo(
+    () => operationRange(period, reference),
+    [period, reference],
+  );
 
   const load = async (selected = range) => {
     setLoading(true);
@@ -713,6 +718,17 @@ function OfficeOperation() {
   const oficinas = data?.oficinas || [];
   const faltan = data?.diasSinDato || [];
   const medidos = data?.diasConDato?.length || 0;
+  const cobertura = data?.cobertura || null;
+
+  /* Saltar al último día que SÍ tiene datos. Sin esto, la tarjeta abre en «hoy»
+   * —que casi nunca está medido, porque el Reporte Diario llega después— y deja
+   * al manager adivinando el rango a mano hasta acertar. */
+  const irAlUltimoMedido = () => {
+    if (!cobertura) return;
+    const p = cobertura.hasta.split("-").map(Number);
+    setPeriod("dia");
+    setReference(new Date(p[0], p[1] - 1, p[2]));
+  };
 
   return (
     <article className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
@@ -759,6 +775,14 @@ function OfficeOperation() {
               ? range.desde
               : `${range.desde} → ${range.hasta}`}
           </span>
+          {cobertura && (
+            <button
+              onClick={irAlUltimoMedido}
+              className="text-xs font-black text-blue-700 underline-offset-2 hover:underline"
+            >
+              Ir al último día medido ({cobertura.hasta})
+            </button>
+          )}
         </div>
       </div>
 
@@ -795,8 +819,12 @@ function OfficeOperation() {
                 días por medir.
               </p>
               <p className="mt-1 text-sm text-amber-800">
-                Las cifras de abajo son de los {medidos} días que sí están
-                medidos, no del periodo entero.{" "}
+                {medidos > 0 ? (
+                  <>
+                    Las cifras de abajo son de los {medidos} días que sí están
+                    medidos, no del periodo entero.{" "}
+                  </>
+                ) : null}
                 <span className="font-semibold">
                   Un día sin fila puede ser un día sin ventas o un día que nadie
                   ha medido: desde aquí no se distinguen.
@@ -822,6 +850,26 @@ function OfficeOperation() {
             <p className="mt-1 text-sm text-slate-500">
               No se muestran cifras porque no las hay — no porque valgan cero.
             </p>
+            {cobertura ? (
+              <div className="mt-4">
+                <p className="text-sm text-slate-600">
+                  Lo medido va del{" "}
+                  <strong className="text-slate-900">{cobertura.desde}</strong> al{" "}
+                  <strong className="text-slate-900">{cobertura.hasta}</strong> ·{" "}
+                  {cobertura.dias} {cobertura.dias === 1 ? "día" : "días"}.
+                </p>
+                <button
+                  onClick={irAlUltimoMedido}
+                  className="mt-3 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-black text-white hover:bg-slate-700"
+                >
+                  Ver el {cobertura.hasta}
+                </button>
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-slate-500">
+                La pestaña todavía no tiene ni un día medido.
+              </p>
+            )}
           </div>
         )}
 
