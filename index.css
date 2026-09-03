@@ -216,3 +216,50 @@ textarea {
 }
 .ic-titulo { color: var(--ic-tinta); }
 .ic-apagado { color: var(--ic-tinta-suave); }
+
+/* ═══ La superficie del panel ════════════════════════════════════════════════
+ *
+ * La dirección elegida no es solo el riel: es que el contenido deje de ser
+ * gris genérico. Aquí se retonan las tres cosas que se repiten por todo el
+ * panel —el borde, la sombra y el azul— para que **no haya que perseguir 39
+ * clases sueltas** por dos ficheros de miles de líneas.
+ *
+ * ⚠️ Va dentro de `.admin-shell`, así que **no toca la landing pública**. Y no
+ * lleva `!important` a propósito: sube por especificidad, no a empujones. Lo
+ * que sigue con `!important` arriba es el tema oscuro, que ya era así.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Un borde de marca en vez del gris de fábrica. */
+.admin-shell :is(.border-slate-100, .border-slate-200) {
+  border-color: var(--ic-borde);
+}
+
+/* Sombras más bajas y frías: el panel se lee mejor plano que flotando. */
+.admin-shell :is(.shadow-sm, .shadow-md) {
+  box-shadow: 0 1px 2px rgba(14, 26, 46, .05), 0 1px 1px rgba(14, 26, 46, .03);
+}
+
+/* Los azules genéricos de Tailwind pasan a ser EL azul de Intercoast. */
+.admin-shell :is(.bg-blue-600, .bg-blue-700) { background-color: var(--ic-azul); }
+.admin-shell :is(.text-blue-700, .text-blue-800) { color: var(--ic-azul); }
+.admin-shell .border-blue-300 { border-color: #9dbdf5; }
+
+/* El lienzo detrás de las secciones sueltas que no llevan superficie propia. */
+.admin-shell .bg-slate-100 { background-color: var(--ic-lienzo); }
+
+/**
+ * Cifras que se pueden comparar de un vistazo.
+ *
+ * ⚠️ En un panel de dinero, dígitos de ancho distinto hacen que dos importes
+ * de la misma magnitud parezcan de magnitudes distintas: el ojo compara el
+ * largo de la mancha, no el número. `tabular-nums` los pone en columna.
+ *
+ * No se carga una fuente monoespaciada para esto: sería una petición de red
+ * más en cada carga del panel, y la maqueta se sostiene igual con las cifras
+ * tabulares de Poppins.
+ */
+.ic-cifra {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: -.01em;
+}

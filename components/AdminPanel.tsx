@@ -98,7 +98,7 @@ function Card({
   tone?: string;
 }) {
   return (
-    <article className="overflow-hidden rounded-2xl bg-white shadow-sm">
+    <article className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
       <div
         className={`h-1 ${tone === "green" ? "bg-emerald-500" : tone === "violet" ? "bg-violet-500" : tone === "amber" ? "bg-amber-500" : "bg-blue-600"}`}
       />
@@ -106,7 +106,7 @@ function Card({
         <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
           {label}
         </p>
-        <p className="mt-2 text-3xl font-black">{value}</p>
+        <p className="ic-cifra mt-2 text-3xl font-black">{value}</p>
         <p className="mt-1 text-xs text-slate-500">{hint}</p>
       </div>
     </article>
