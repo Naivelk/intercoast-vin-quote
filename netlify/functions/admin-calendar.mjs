@@ -48,12 +48,30 @@ export default async (request) => {
 
   try {
     const base = process.env.INTERCOAST_BOT_API_URL;
+    const token = process.env.INTERCOAST_CALENDAR_PANEL_TOKEN;
     if (!base) throw new Error("El calendario no está configurado.");
+    if (!token) throw new Error("El acceso privado al calendario no está configurado.");
     const target = new URL(base);
-    target.searchParams.set("fn", "panelCalendar");
-    target.searchParams.set("start", startDate.toISOString());
-    target.searchParams.set("end", endDate.toISOString());
-    const response = await fetch(target);
+    /* La URL heredada trae la clave del endpoint de diagnósticos. Este puente
+     * no la usa ni la reenvía: el calendario contiene títulos de clientes y
+     * se protege con una credencial exclusiva que viaja solo por POST. */
+    target.searchParams.delete("key");
+    target.searchParams.delete("fn");
+    const response = await fetch(target, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        action: "panelCalendar",
+        token,
+        start: startDate.toISOString(),
+        end: endDate.toISOString(),
+      }),
+      signal: AbortSignal.timeout(55000),
+    });
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.toLowerCase().includes("application/json")) {
+      throw new Error("Google Calendar devolvió una respuesta inválida.");
+    }
     const data = await response.json();
     if (!data.ok)
       throw new Error(data.error || "Google Calendar no respondió.");

@@ -902,9 +902,10 @@ export default function AdminPanel() {
    * que termine de pintarse la pantalla que tiene delante, y después lo de
    * detrás. Va en silencio y no puede romper nada — ver `precargarPanel`. */
   useEffect(() => {
+    if (!user) return;
     const t = setTimeout(() => void precargarPanel(), 1500);
     return () => clearTimeout(t);
-  }, []);
+  }, [user]);
 
   /* Y lo mantiene fresco mientras el panel siga abierto, cada diez minutos.
    *
@@ -916,6 +917,7 @@ export default function AdminPanel() {
    * ⚠️ Solo con la pestaña **visible**: refrescar un panel que nadie está
    * mirando es gastar cuota de Apps Script por nada. */
   useEffect(() => {
+    if (!user) return;
     const cada = window.setInterval(
       () => {
         if (document.visibilityState === "visible") void precargarPanel();
@@ -923,7 +925,7 @@ export default function AdminPanel() {
       10 * 60 * 1000,
     );
     return () => window.clearInterval(cada);
-  }, []);
+  }, [user]);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
