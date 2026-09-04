@@ -1085,6 +1085,38 @@ export default function AdminPanel() {
     a.click();
     URL.revokeObjectURL(a.href);
   };
+  /* ⚠️ TODO HOOK VA ANTES DEL `if (!user)` DE AQUÍ ABAJO, sin excepción.
+   *
+   * Estas tres líneas nacieron pegadas al JSX que las usa, cien líneas más
+   * abajo, y dejaron el panel EN BLANCO para quien ya tenía sesión: sin
+   * usuario React corre N hooks y sale por el return; con usuario corre N+3,
+   * y eso es el error #310 —«rendered more hooks than during the previous
+   * render»—, que no degrada nada: desmonta el árbol entero.
+   *
+   * No lo vio nadie desde fuera porque **sin entrar solo se llega al
+   * formulario de acceso**: el fallo empieza justo donde termina lo que se
+   * puede mirar sin sesión. El síntoma tampoco ayuda —una página en blanco no
+   * dice qué la dejó así— y hay que ir a la consola del navegador a leerlo.
+   *
+   * La insignia llama la atención SOLO cuando sube: un lead nuevo sin asignar
+   * es algo que acaba de pasar. Si baja —porque alguien lo asignó— no hay nada
+   * que anunciar, y llamar ahí enseñaría a ignorar la insignia.
+   */
+  const unassigned = leads.filter(
+    (lead) => !lead.asesor && !["Vendido", "Perdido"].includes(lead.estado),
+  ).length;
+  const [insigniaLlama, setInsigniaLlama] = useState(false);
+  const antesSinAsignar = useRef(unassigned);
+  useEffect(() => {
+    if (unassigned > antesSinAsignar.current) {
+      setInsigniaLlama(true);
+      const t = setTimeout(() => setInsigniaLlama(false), 2800);
+      antesSinAsignar.current = unassigned;
+      return () => clearTimeout(t);
+    }
+    antesSinAsignar.current = unassigned;
+  }, [unassigned]);
+
   if (!user)
     return (
       <main className="grid min-h-screen place-items-center bg-slate-950 p-4">
@@ -1138,24 +1170,6 @@ export default function AdminPanel() {
         </form>
       </main>
     );
-  const unassigned = leads.filter(
-    (lead) => !lead.asesor && !["Vendido", "Perdido"].includes(lead.estado),
-  ).length;
-
-  /* La insignia llama la atención **solo cuando sube**: un lead nuevo sin
-   * asignar es algo que acaba de pasar. Si baja —porque alguien lo asignó— no
-   * hay nada que anunciar, y llamar ahí enseñaría a ignorar la insignia. */
-  const [insigniaLlama, setInsigniaLlama] = useState(false);
-  const antesSinAsignar = useRef(unassigned);
-  useEffect(() => {
-    if (unassigned > antesSinAsignar.current) {
-      setInsigniaLlama(true);
-      const t = setTimeout(() => setInsigniaLlama(false), 2800);
-      antesSinAsignar.current = unassigned;
-      return () => clearTimeout(t);
-    }
-    antesSinAsignar.current = unassigned;
-  }, [unassigned]);
   const urgentCases = (retention?.cases || []).filter(
     (item) => Number(item.Prioridad || item.Score || item.score || 0) >= 90,
   ).length;

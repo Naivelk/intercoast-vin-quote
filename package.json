@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
-    "typecheck:admin": "tsc --noEmit -p tsconfig.admin.json"
+    "typecheck:admin": "tsc --noEmit -p tsconfig.admin.json",
+    "lint:hooks": "eslint components netlify src"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.7",
