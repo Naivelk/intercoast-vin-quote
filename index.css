@@ -289,3 +289,93 @@ textarea {
 /* El acento de esas cabeceras es el dorado de la marca, no un cian suelto. */
 .ic-marca .ic-acento { color: #ffd65c; }
 .ic-marca .ic-sobre { color: rgba(255, 255, 255, .82); }
+
+/* ═══ EL FOCO SE VE ═══════════════════════════════════════════════════════════
+ *
+ * `focus-visible` no aparecía **ni una vez** en toda la hoja. Quien navega con
+ * el teclado —o quien llega ahí sin querer— no tenía forma de saber dónde está,
+ * y el anillo de fábrica del navegador choca con el azul de la casa.
+ *
+ * `:focus-visible` y no `:focus`: así no sale al hacer clic con el ratón, solo
+ * cuando de verdad hace falta.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+.admin-shell :is(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--ic-azul);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* Sobre el riel azul el anillo azul no se vería: ahí va en blanco. */
+.ic-riel :is(button, a, [tabindex]):focus-visible {
+  outline-color: #fff;
+  outline-offset: 3px;
+}
+
+/* ═══ LA VISTA ENTRA, NO APARECE DE GOLPE ════════════════════════════════════
+ *
+ * Cambiar de ventana era un corte seco. Una entrada de 180 ms —muy corta y sin
+ * desplazamiento largo— hace que el ojo siga el cambio en vez de reencuadrar de
+ * cero. Es lo que separa «funciona» de «está cuidado».
+ * ═══════════════════════════════════════════════════════════════════════════ */
+@keyframes ic-entra {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+.ic-vista { animation: ic-entra 180ms ease-out both; }
+
+/* ═══ LAS TARJETAS RESPONDEN ═════════════════════════════════════════════════
+ *
+ * Un panel donde nada reacciona al ratón se siente muerto. Un grado de sombra y
+ * un píxel de subida bastan: más que eso, en una pantalla llena de tarjetas,
+ * marea.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+.admin-shell article.shadow-sm,
+.admin-shell section.shadow-sm {
+  transition: box-shadow 160ms ease, transform 160ms ease;
+}
+.admin-shell article.shadow-sm:hover,
+.admin-shell section.shadow-sm:hover {
+  box-shadow: 0 6px 18px rgba(14, 26, 46, .09), 0 2px 5px rgba(14, 26, 46, .05);
+  transform: translateY(-1px);
+}
+
+/* ═══ DETALLES DE CASA ═══════════════════════════════════════════════════════ */
+
+/* Seleccionar texto con el azul de la marca, no con el del sistema. */
+.admin-shell ::selection {
+  background: rgba(0, 87, 217, .18);
+  color: var(--ic-tinta);
+}
+
+/* La barra de desplazamiento clara chirriaba sobre el tema oscuro. */
+.admin-shell {
+  scrollbar-color: var(--ic-borde) transparent;
+  scrollbar-width: thin;
+}
+.admin-shell ::-webkit-scrollbar { width: 10px; height: 10px; }
+.admin-shell ::-webkit-scrollbar-track { background: transparent; }
+.admin-shell ::-webkit-scrollbar-thumb {
+  background: var(--ic-borde);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 999px;
+}
+.admin-shell ::-webkit-scrollbar-thumb:hover { background-color: var(--ic-tinta-suave); background-clip: content-box; }
+
+/* ═══ Y QUIEN NO QUIERA MOVIMIENTO, NO LO TIENE ══════════════════════════════
+ *
+ * No es un detalle menor: para algunas personas el movimiento en pantalla
+ * produce mareo de verdad. Si el sistema lo pide, aquí no se mueve nada — ni la
+ * entrada de la vista, ni el latido de los esqueletos, ni las tarjetas.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  .admin-shell *,
+  .admin-shell *::before,
+  .admin-shell *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+  .admin-shell article.shadow-sm:hover,
+  .admin-shell section.shadow-sm:hover { transform: none; }
+}

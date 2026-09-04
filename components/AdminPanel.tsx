@@ -1677,26 +1677,34 @@ export default function AdminPanel() {
           </section>
         ) : null}
         {visitedWorkspaces.includes("consola") && (
-          <div className={view === "consola" ? "block" : "hidden"}>
+          <div className={view === "consola" ? "ic-vista block" : "hidden"}>
             <NativeConsole />
           </div>
         )}
         {visitedWorkspaces.includes("zelle") && (
-          <div className={view === "zelle" ? "block" : "hidden"}>
+          <div className={view === "zelle" ? "ic-vista block" : "hidden"}>
             <NativeZelle />
           </div>
         )}
         {visitedWorkspaces.includes("calendario") && (
-          <div className={view === "calendario" ? "block" : "hidden"}>
+          <div className={view === "calendario" ? "ic-vista block" : "hidden"}>
             <NativeCalendar />
           </div>
         )}
         {view === "hoy" && (
           <TodayHome onNavigate={(target) => setView(target as typeof view)} />
         )}
-        {view === "operacion" && <OfficeOperation />}
+        {view === "operacion" && (
+            <div className="ic-vista">
+              <OfficeOperation />
+            </div>
+          )}
         {view === "automatizaciones" && <AutomationCenter />}
-        {view === "control" && <SystemControl />}
+        {view === "control" && (
+            <div className="ic-vista">
+              <SystemControl />
+            </div>
+          )}
         {view === "diagnosticos" && <DiagnosticsPanel />}
         {view === "auditoria" && (
           <AuditPanel entries={auditEntries} loading={auditLoading} />
