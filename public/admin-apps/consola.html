@@ -319,6 +319,102 @@
                  cursor: pointer; transition: background .15s, border-color .15s; }
     .mas-casos:hover { background: var(--superficie-2); border-style: solid; }
 
+    /* ---------- asistencia ---------- */
+    .asis-tabla { overflow-x: auto; border: 1px solid var(--linea);
+                  border-radius: var(--r); background: var(--superficie); }
+    .asis-tabla table { width: 100%; min-width: 36rem; border-collapse: collapse;
+                       font-size: .84rem; }
+    .asis-tabla th { padding: .65rem .75rem; text-align: left; color: var(--tenue);
+                     font-family: var(--mono); font-size: .58rem; letter-spacing: .09em;
+                     text-transform: uppercase; background: var(--superficie-2); }
+    .asis-tabla td { padding: .65rem .75rem; border-top: 1px solid var(--linea-suave);
+                     font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .asis-tabla td.agente { font-weight: 700; color: var(--tinta); }
+    .asis-estado { display: inline-flex; padding: .2rem .5rem; border-radius: 99px;
+                   font-family: var(--mono); font-size: .58rem; font-weight: 750;
+                   letter-spacing: .04em; color: var(--suave); border: 1px solid var(--linea); }
+    .asis-estado.trabajando { color: var(--acento-claro); background: var(--acento-fondo);
+                              border-color: var(--acento-linea); }
+    .asis-estado.termino { color: var(--bien); background: var(--bien-fondo);
+                           border-color: rgba(61,217,160,.3); }
+    .asis-estado.ausente { color: var(--mal); background: var(--mal-fondo);
+                           border-color: rgba(255,123,133,.3); }
+    .asis-estado.incompleta { color: var(--alerta); background: var(--alerta-fondo);
+                              border-color: var(--alerta-linea); }
+
+    /* ---------- centro de control ---------- */
+    .control-cab { display: flex; align-items: center; justify-content: space-between;
+                   gap: .75rem; flex-wrap: wrap; }
+    .control-cab h2 { flex: 1; }
+    .ctl-sello { font-family: var(--mono); color: var(--tenue); font-size: .68rem; }
+    .ctl-resumen { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+                   gap: .55rem; }
+    .ctl-modulos { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+                   gap: .55rem; }
+    .ctl-modulo { background: var(--superficie); border: 1px solid var(--linea);
+                  border-radius: var(--r); padding: .75rem .85rem; min-width: 0; }
+    .ctl-modulo.error { border-color: rgba(255,123,133,.35); background:
+                        linear-gradient(var(--mal-fondo), transparent), var(--superficie); }
+    .ctl-modulo.aviso { border-color: var(--alerta-linea); background:
+                        linear-gradient(var(--alerta-fondo), transparent), var(--superficie); }
+    .ctl-modulo .arriba { display: flex; justify-content: space-between; gap: .6rem;
+                          align-items: start; }
+    .ctl-modulo .nombre { font-weight: 650; line-height: 1.3; }
+    .ctl-modulo .grupo { font-family: var(--mono); font-size: .58rem; color: var(--tenue);
+                         letter-spacing: .08em; text-transform: uppercase; margin-top: .15rem; }
+    .ctl-modulo .cuando { font-size: .74rem; color: var(--suave); margin-top: .45rem;
+                          overflow-wrap: anywhere; }
+    .ctl-estado { flex: none; font-family: var(--mono); font-size: .58rem; font-weight: 750;
+                  letter-spacing: .06em; padding: .2rem .42rem; border-radius: 99px;
+                  color: var(--bien); background: var(--bien-fondo);
+                  border: 1px solid rgba(61,217,160,.3); }
+    .ctl-estado.error { color: var(--mal); background: var(--mal-fondo);
+                        border-color: rgba(255,123,133,.3); }
+    .ctl-estado.aviso, .ctl-estado.sin_registro { color: var(--alerta);
+                        background: var(--alerta-fondo); border-color: var(--alerta-linea); }
+    .ctl-acciones { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+                    gap: .55rem; }
+    .ctl-accion { text-align: left; background: var(--superficie); color: var(--tinta);
+                  border: 1px solid var(--linea); border-radius: var(--r); padding: .7rem .8rem;
+                  cursor: pointer; font: inherit; transition: border-color .15s, background .15s; }
+    .ctl-accion:hover { border-color: var(--acento-linea); background: var(--superficie-2); }
+    .ctl-accion:disabled { opacity: .45; cursor: wait; }
+    .ctl-accion b { display: block; color: var(--acento-claro); font-size: .9rem; }
+    .ctl-accion span { display: block; color: var(--suave); font-size: .76rem; margin-top: .12rem; }
+    .ctl-fecha { display: flex; align-items: end; gap: .55rem; flex-wrap: wrap;
+                 padding: .7rem .8rem; background: var(--superficie);
+                 border: 1px solid var(--linea); border-radius: var(--r); }
+    .ctl-fecha label { display: flex; flex-direction: column; gap: .2rem; color: var(--suave);
+                       font-family: var(--mono); font-size: .65rem; text-transform: uppercase; }
+    .ctl-fecha input { color-scheme: dark; background: var(--fondo); color: var(--tinta);
+                       border: 1px solid var(--linea); border-radius: var(--r-sm);
+                       padding: .45rem .55rem; font: inherit; font-size: .85rem; }
+    .ctl-cola { display: flex; flex-direction: column; gap: .35rem; }
+    .ctl-orden { display: grid; grid-template-columns: minmax(8rem, 1fr) auto;
+                 gap: .5rem 1rem; padding: .55rem .7rem; border-radius: var(--r-sm);
+                 background: rgba(255,255,255,.025); border: 1px solid var(--linea-suave);
+                 font-size: .8rem; }
+    .ctl-orden code { color: var(--acento-claro); overflow-wrap: anywhere; }
+    .ctl-orden .meta { color: var(--tenue); font-family: var(--mono); font-size: .66rem; }
+    .ctl-mensaje { min-height: 1.4rem; }
+    .ctl-periodo { display: inline-flex; gap: .25rem; padding: .2rem;
+                   background: var(--superficie); border: 1px solid var(--linea);
+                   border-radius: 99px; }
+    .ctl-periodo button { border: 0; border-radius: 99px; padding: .28rem .65rem;
+                          background: transparent; color: var(--suave); cursor: pointer;
+                          font: inherit; font-size: .72rem; }
+    .ctl-periodo button.activo { background: var(--acento); color: #06101F; font-weight: 700; }
+    .ctl-graficas { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+                    gap: .55rem; }
+    .ctl-grafica { background: var(--superficie); border: 1px solid var(--linea);
+                   border-radius: var(--r); padding: .7rem .8rem; min-width: 0; }
+    .ctl-grafica .titulo { font-size: .82rem; font-weight: 650; }
+    .ctl-grafica .subtitulo { color: var(--tenue); font-family: var(--mono);
+                              font-size: .6rem; margin-top: .08rem; }
+    .ctl-grafica svg { display: block; width: 100%; height: 9rem; margin-top: .45rem; overflow: visible; }
+    .ctl-grafica .vacio { height: 9rem; display: grid; place-items: center;
+                          color: var(--tenue); font-size: .8rem; }
+
     /* ---------- avisos y estados ---------- */
     .aviso { background: var(--alerta-fondo); border: 1px solid var(--alerta-linea);
              border-radius: var(--r); padding: .95rem 1.15rem; }
@@ -464,6 +560,8 @@
   </div>
 
   <nav class="nav">
+    <a href="#asistencia-panel">Asistencia</a>
+    <a href="#control">Control</a>
     <a href="#buscar">Buscar</a>
     <a href="#casos">Casos de hoy</a>
     <a href="#cartera">Cartera</a>
@@ -471,6 +569,92 @@
     <a href="#correo">Correo</a>
     <a href="#reportes">Reportes</a>
   </nav>
+
+  <section id="asistencia-panel">
+    <div class="control-cab">
+      <h2>Asistencia</h2>
+      <button type="button" class="ahora" id="asis-refrescar">Actualizar</button>
+    </div>
+    <p class="chico apagado">
+      Entrada, salida y horas registradas desde la página de Zelle.
+    </p>
+    <div class="rango" id="asis-rango">
+      <button type="button" data-periodo="hoy" class="activo">Hoy</button>
+      <button type="button" data-periodo="semana">Semana</button>
+      <button type="button" data-periodo="mes">Mes</button>
+    </div>
+    <div class="ctl-resumen" id="asis-resumen"></div>
+    <div id="asis-tabla" class="asis-tabla"><div class="estado">Leyendo la asistencia…</div></div>
+    <div class="aviso chico">
+      <span class="r">Horario pendiente</span>
+      Se muestran las horas reales. “Llegó tarde” y “salió antes” se activarán
+      cuando se defina el horario esperado de cada agente.
+    </div>
+    <div class="ctl-sello" id="asis-sello"></div>
+  </section>
+
+  <hr>
+
+  <section id="control">
+    <div class="control-cab">
+      <h2>Centro de control</h2>
+      <button type="button" class="ahora" id="ctl-refrescar">Actualizar estado</button>
+    </div>
+    <p class="chico apagado">
+      Una vista de los procesos del bot y un solo lugar para ejecutarlos. Los
+      botones dejan una orden segura; el bot la recoge en menos de un minuto y
+      manda el resultado al grupo de Telegram.
+    </p>
+    <div class="ctl-resumen" id="ctl-resumen">
+      <div class="casilla"><span class="n vacio">—</span><span class="r">procesos</span></div>
+      <div class="casilla"><span class="n vacio">—</span><span class="r">problemas</span></div>
+      <div class="casilla"><span class="n vacio">—</span><span class="r">órdenes pendientes</span></div>
+    </div>
+    <div class="ctl-modulos" id="ctl-modulos"><div class="estado">Leyendo el sistema…</div></div>
+
+    <div class="control-cab">
+      <div><b>Rendimiento</b><div class="ctl-sello">Duración máxima y ejecuciones con aviso/error</div></div>
+      <div class="ctl-periodo" id="ctl-periodo">
+        <button type="button" data-dias="7" class="activo">7 días</button>
+        <button type="button" data-dias="30">30 días</button>
+      </div>
+    </div>
+    <div class="ctl-graficas" id="ctl-graficas"><div class="estado">Leyendo tendencias…</div></div>
+
+    <div>
+      <div class="rotulo">Reportes de entrada</div>
+      <div class="ctl-modulos" id="ctl-fuentes"><div class="estado">Leyendo fuentes…</div></div>
+    </div>
+
+    <div class="caja chico">
+      <p><b>Ejecutar ahora</b> <span class="apagado">· usa la misma lógica que Telegram y los activadores.</span></p>
+      <div class="ctl-fecha">
+        <label>Semana opcional (lunes)
+          <input type="date" id="ctl-fecha" aria-label="Lunes de la semana">
+        </label>
+        <span class="apagado">Vacía = semana vencida. Solo aplica a nómina y recibos.</span>
+      </div>
+      <div class="ctl-acciones" id="ctl-acciones">
+        <button class="ctl-accion" data-comando="estado"><b>/estado</b><span>Enviar diagnóstico a Telegram</span></button>
+        <button class="ctl-accion" data-comando="saldo"><b>/saldo</b><span>Calcular lo pendiente por oficina</span></button>
+        <button class="ctl-accion" data-comando="cuadre"><b>/cuadre</b><span>Rellenar y revisar cuentas</span></button>
+        <button class="ctl-accion" data-comando="comisiones"><b>/comisiones</b><span>Revisar comisiones de Karla</span></button>
+        <button class="ctl-accion" data-comando="nomina" data-fecha="1"><b>/nomina</b><span>Liquidar la semana vencida</span></button>
+        <button class="ctl-accion" data-comando="recibos" data-fecha="1"><b>/recibos</b><span>Generar sus PDF de pago</span></button>
+        <button class="ctl-accion" data-comando="llenar"><b>/llenar</b><span>Actualizar libros hasta ayer</span></button>
+        <button class="ctl-accion" data-comando="llenarhoy" data-confirmar="La oficina debe estar cerrada. ¿Actualizar incluyendo hoy?"><b>/llenarhoy</b><span>Actualizar incluyendo el día de hoy</span></button>
+      </div>
+      <div class="ctl-mensaje chico" id="ctl-mensaje"></div>
+    </div>
+
+    <div>
+      <div class="rotulo">Actividad reciente</div>
+      <div class="ctl-cola" id="ctl-cola"><div class="estado">Leyendo la cola…</div></div>
+    </div>
+    <div class="ctl-sello" id="ctl-sello"></div>
+  </section>
+
+  <hr>
 
   <section id="buscar">
     <h2>Buscar un cliente</h2>
@@ -636,6 +820,289 @@
            '<p class="chico">' + esc(m) + "</p></div>";
   }
 
+  /* ---------- asistencia ---------- */
+  var asisPeriodo = "hoy";
+  var asisCargando = false;
+  var asisRango = document.getElementById("asis-rango");
+  var asisResumen = document.getElementById("asis-resumen");
+  var asisTabla = document.getElementById("asis-tabla");
+  var asisSello = document.getElementById("asis-sello");
+  var asisRefrescar = document.getElementById("asis-refrescar");
+
+  function asisEtiqueta(valor) {
+    return {
+      "en-jornada": { texto: "Trabajando", clase: "trabajando" },
+      "cerrada": { texto: "Terminó", clase: "termino" },
+      "sin-iniciar": { texto: "Sin iniciar", clase: "" },
+      "ausente": { texto: "No trabajó", clase: "ausente" },
+      "sin-cerrar": { texto: "No cerró", clase: "incompleta" }
+    }[valor] || { texto: valor || "Sin estado", clase: "" };
+  }
+
+  function pintarAsistencia(r) {
+    if (!r || !r.ok) {
+      asisTabla.innerHTML = fallo(r && r.mensaje || "Sin respuesta.");
+      return;
+    }
+    var sinIniciar = r.filas.filter(function (f) { return f.estado === "sin-iniciar"; }).length;
+    asisResumen.innerHTML = r.periodo === "hoy"
+      ? '<div class="casilla"><span class="n">' + r.resumen.trabajando +
+          '</span><span class="r">trabajando</span></div>' +
+        '<div class="casilla"><span class="n">' + r.resumen.cerradas +
+          '</span><span class="r">ya terminaron</span></div>' +
+        '<div class="casilla ' + (sinIniciar ? "urge" : "") + '"><span class="n">' + sinIniciar +
+          '</span><span class="r">sin iniciar</span></div>' +
+        '<div class="casilla plata"><span class="n">' + Number(r.resumen.horas || 0).toFixed(2) +
+          '</span><span class="r">horas cerradas</span></div>'
+      : '<div class="casilla"><span class="n">' + r.resumen.conEntrada +
+          '</span><span class="r">jornadas iniciadas</span></div>' +
+        '<div class="casilla ' + (r.resumen.ausencias ? "urge" : "") + '"><span class="n">' + r.resumen.ausencias +
+          '</span><span class="r">no trabajaron</span></div>' +
+        '<div class="casilla"><span class="n">' + r.resumen.sinCerrar +
+          '</span><span class="r">no cerraron</span></div>' +
+        '<div class="casilla plata"><span class="n">' + Number(r.resumen.horas || 0).toFixed(2) +
+          '</span><span class="r">horas registradas</span></div>';
+
+    var conFecha = r.periodo !== "hoy";
+    var cabeza = '<thead><tr>' + (conFecha ? "<th>Fecha</th>" : "") +
+      "<th>Agente</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Estado</th></tr></thead>";
+    var cuerpo = r.filas.map(function (f) {
+      var e = asisEtiqueta(f.estado);
+      return "<tr>" + (conFecha ? "<td>" + esc(f.fecha) + "</td>" : "") +
+        '<td class="agente">' + esc(f.agente) + "</td><td>" + esc(f.entrada || "—") +
+        "</td><td>" + esc(f.salida || "—") + "</td><td>" +
+        (f.horas === "" ? "—" : Number(f.horas).toFixed(2)) +
+        '</td><td><span class="asis-estado ' + e.clase + '">' + esc(e.texto) +
+        "</span></td></tr>";
+    }).join("");
+    asisTabla.innerHTML = "<table>" + cabeza + "<tbody>" + cuerpo + "</tbody></table>";
+    asisSello.textContent = "Periodo: " + r.desde + " a " + r.hasta +
+      " · actualizado " + r.generado + " (California)";
+  }
+
+  function cargarAsistencia() {
+    if (asisCargando) return;
+    asisCargando = true;
+    asisRefrescar.disabled = true;
+    asisRefrescar.textContent = "Leyendo…";
+    google.script.run
+      .withSuccessHandler(function (r) {
+        asisCargando = false;
+        asisRefrescar.disabled = false;
+        asisRefrescar.textContent = "Actualizar";
+        pintarAsistencia(r);
+      })
+      .withFailureHandler(function (e) {
+        asisCargando = false;
+        asisRefrescar.disabled = false;
+        asisRefrescar.textContent = "Actualizar";
+        asisTabla.innerHTML = fallo("Ocurrió un error inesperado. Recarga la consola.");
+      })
+      .resumenAsistencia(asisPeriodo);
+  }
+
+  asisRango.addEventListener("click", function (ev) {
+    var b = ev.target.closest("button[data-periodo]");
+    if (!b) return;
+    asisPeriodo = b.getAttribute("data-periodo");
+    Array.prototype.forEach.call(asisRango.querySelectorAll("button"), function (x) {
+      x.classList.toggle("activo", x === b);
+    });
+    asisTabla.innerHTML = estado("Leyendo la asistencia…");
+    cargarAsistencia();
+  });
+  asisRefrescar.addEventListener("click", cargarAsistencia);
+  cargarAsistencia();
+  setInterval(function () {
+    if (document.visibilityState === "visible") cargarAsistencia();
+  }, 30000);
+
+  /* ---------- centro de control ---------- */
+  var ctlModulos = document.getElementById("ctl-modulos");
+  var ctlResumen = document.getElementById("ctl-resumen");
+  var ctlCola = document.getElementById("ctl-cola");
+  var ctlSello = document.getElementById("ctl-sello");
+  var ctlGraficas = document.getElementById("ctl-graficas");
+  var ctlFuentes = document.getElementById("ctl-fuentes");
+  var ctlPeriodo = document.getElementById("ctl-periodo");
+  var ctlMensaje = document.getElementById("ctl-mensaje");
+  var ctlRefrescar = document.getElementById("ctl-refrescar");
+  var ctlCargando = false;
+  var ctlDias = 7;
+  var ctlUltimaRespuesta = null;
+
+  function ctlClase(estadoDato) {
+    var e = String(estadoDato || "SIN_REGISTRO").toLowerCase();
+    if (e === "error" || e === "congelado" || e === "desactualizado") return "error";
+    if (e === "aviso" || e === "sin_registro" || e === "atrasado" || e === "sin_medir" || e === "sin_distinguir") return "aviso";
+    if (e === "pendiente" || e === "ejecutando") return "aviso";
+    return "";
+  }
+
+  function ctlRotulo(estadoDato) {
+    return {
+      OK: "Bien", ERROR: "Error", AVISO: "Revisar", OMITIDA: "Ya hecha",
+      SIN_REGISTRO: "Sin registro", INICIADO: "Iniciado", EN_CURSO: "En curso",
+      CONGELADO: "Congelado", ATRASADO: "Atrasado", DESACTUALIZADO: "Desactualizado",
+      SIN_MEDIR: "Sin medir", SIN_DISTINGUIR: "Por confirmar"
+    }[estadoDato] || estadoDato || "Sin registro";
+  }
+
+  function ctlSvgSerie(datos, campo, techoMinimo, color, unidad) {
+    if (!datos.length) return '<div class="vacio">Todavía no hay historial suficiente.</div>';
+    var w = 600, h = 145, izq = 34, der = 12, arriba = 12, abajo = 24;
+    var max = Math.max(techoMinimo, Math.max.apply(null, datos.map(function (x) { return Number(x[campo]) || 0; })));
+    var dx = datos.length > 1 ? (w - izq - der) / (datos.length - 1) : 0;
+    var puntos = datos.map(function (x, i) {
+      var px = izq + i * dx;
+      var py = arriba + (h - arriba - abajo) * (1 - (Number(x[campo]) || 0) / max);
+      return px.toFixed(1) + ',' + py.toFixed(1);
+    }).join(' ');
+    var ultimo = Number(datos[datos.length - 1][campo]) || 0;
+    return '<svg viewBox="0 0 ' + w + ' ' + h + '" role="img" aria-label="Tendencia">' +
+      '<line x1="' + izq + '" y1="' + (h-abajo) + '" x2="' + (w-der) + '" y2="' + (h-abajo) + '" stroke="var(--linea)" />' +
+      '<line x1="' + izq + '" y1="' + arriba + '" x2="' + izq + '" y2="' + (h-abajo) + '" stroke="var(--linea)" />' +
+      '<polyline fill="none" stroke="' + color + '" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" points="' + puntos + '" />' +
+      '<text x="0" y="' + (arriba+5) + '" fill="var(--tenue)" font-size="11">' + esc(max) + '</text>' +
+      '<text x="' + izq + '" y="' + (h-5) + '" fill="var(--tenue)" font-size="11">' + esc(datos[0].fecha.substring(5)) + '</text>' +
+      '<text x="' + (w-der) + '" y="' + (h-5) + '" text-anchor="end" fill="var(--tenue)" font-size="11">' + esc(datos[datos.length-1].fecha.substring(5)) + '</text>' +
+      '<text x="' + (w-der) + '" y="' + (arriba+5) + '" text-anchor="end" fill="' + color + '" font-size="12" font-weight="700">último: ' + esc(ultimo) + esc(unidad) + '</text></svg>';
+  }
+
+  function ctlPintarGraficas(tendencias) {
+    var datos = (tendencias || []).slice(-ctlDias);
+    ctlGraficas.innerHTML = '<div class="ctl-grafica"><div class="titulo">Duración máxima del día</div>' +
+      '<div class="subtitulo">segundos · la línea superior toma al menos el límite de 360 s</div>' +
+      ctlSvgSerie(datos, 'maximo', 360, 'var(--acento)', ' s') + '</div>' +
+      '<div class="ctl-grafica"><div class="titulo">Avisos y errores</div>' +
+      '<div class="subtitulo">ejecuciones que terminaron con algo por revisar</div>' +
+      ctlSvgSerie(datos, 'alertas', 1, 'var(--mal)', '') + '</div>';
+  }
+
+  function pintarControl(r) {
+    if (!r || !r.ok) {
+      ctlModulos.innerHTML = fallo(r && r.mensaje || "Sin respuesta.");
+      return;
+    }
+    ctlUltimaRespuesta = r;
+    var bien = r.componentes.filter(function (c) {
+      return c.estado === "OK" || c.estado === "OMITIDA";
+    }).length;
+    ctlResumen.innerHTML =
+      '<div class="casilla"><span class="n">' + bien + "/" + r.componentes.length +
+        '</span><span class="r">procesos registrados bien</span></div>' +
+      '<div class="casilla ' + (r.problemas ? "urge" : "") + '"><span class="n">' +
+        r.problemas + '</span><span class="r">problemas visibles</span></div>' +
+      '<div class="casilla"><span class="n">' + r.ordenes.pendientes +
+        '</span><span class="r">órdenes pendientes</span></div>' +
+      '<div class="casilla ' + ((r.fuentes || []).some(function (f) { return f.estado === "DESACTUALIZADO"; }) ? "urge" : "") + '"><span class="n">' +
+        (r.fuentes || []).filter(function (f) { return f.estado === "DESACTUALIZADO"; }).length +
+        '</span><span class="r">reportes desactualizados</span></div>';
+
+    ctlModulos.innerHTML = r.componentes.map(function (c) {
+      var capacidadAlerta = c.capacidad &&
+        (c.capacidad.estado === "AVISO" || c.capacidad.estado === "CRITICO");
+      var clase = capacidadAlerta ? (c.capacidad.estado === "CRITICO" ? "error" : "aviso") : ctlClase(c.estado);
+      var rotulo = capacidadAlerta ? "Capacidad" : ctlRotulo(c.estado);
+      var cuando = c.fin
+        ? "Última: " + esc(c.fin) + (c.duracion ? " · " + esc(c.duracion) + " s" : "")
+        : esc(c.detalle);
+      if (c.capacidad) cuando += " · prom. " + esc(c.capacidad.promedio) +
+        " s · p95 " + esc(c.capacidad.p95) + " s · máx. " + esc(c.capacidad.maximo) + " s";
+      return '<div class="ctl-modulo ' + clase + '">' +
+        '<div class="arriba"><div><div class="nombre">' + esc(c.nombre) + '</div>' +
+        '<div class="grupo">' + esc(c.grupo) + '</div></div>' +
+        '<span class="ctl-estado ' + clase + '">' + esc(rotulo) + '</span></div>' +
+        '<div class="cuando">' + cuando + '</div></div>';
+    }).join("");
+
+    ctlPintarGraficas(r.tendencias || []);
+    ctlFuentes.innerHTML = (r.fuentes || []).map(function (f) {
+      var clase = ctlClase(f.estado);
+      var detalle = f.estado === "SIN_MEDIR" ? "Se empezará a medir cuando llegue el próximo archivo." :
+        (f.estado === "SIN_DISTINGUIR"
+          ? "El registro anterior juntaba los dos reportes de pólizas. El próximo archivo quedará identificado por separado."
+          : "Última fuente: " + esc(f.ultima) + " · hace " + esc(f.dias) + " día(s) · límite " + esc(f.maxDias));
+      return '<div class="ctl-modulo ' + clase + '"><div class="arriba"><div><div class="nombre">' +
+        esc(f.nombre) + '</div><div class="grupo">Entrada</div></div><span class="ctl-estado ' + clase + '">' +
+        esc(ctlRotulo(f.estado)) + '</span></div><div class="cuando">' + detalle + '</div></div>';
+    }).join("");
+
+    ctlCola.innerHTML = r.ordenes.recientes.length
+      ? r.ordenes.recientes.map(function (o) {
+          var detalle = o.error || o.resultado || o.creada;
+          return '<div class="ctl-orden"><div><code>' + esc(o.comando) + '</code>' +
+            '<div class="meta">' + esc(detalle) + '</div></div>' +
+            '<span class="ctl-estado ' + ctlClase(o.estado) + '">' + esc(o.estado) + '</span></div>';
+        }).join("")
+      : estado("Todavía no hay órdenes hechas desde la página.");
+    ctlSello.textContent = "Estado leído: " + r.generado;
+  }
+
+  function cargarControl(silencioso) {
+    if (ctlCargando) return;
+    ctlCargando = true;
+    ctlRefrescar.disabled = true;
+    ctlRefrescar.textContent = "Leyendo…";
+    if (!silencioso) ctlMensaje.textContent = "";
+    google.script.run
+      .withSuccessHandler(function (r) {
+        ctlCargando = false;
+        ctlRefrescar.disabled = false;
+        ctlRefrescar.textContent = "Actualizar estado";
+        pintarControl(r);
+      })
+      .withFailureHandler(function (e) {
+        ctlCargando = false;
+        ctlRefrescar.disabled = false;
+        ctlRefrescar.textContent = "Actualizar estado";
+        if (!silencioso) ctlModulos.innerHTML = fallo("Ocurrió un error inesperado. Recarga la consola.");
+      })
+      .centroControl();
+  }
+
+  ctlRefrescar.addEventListener("click", function () { cargarControl(false); });
+  ctlPeriodo.addEventListener("click", function (ev) {
+    var b = ev.target.closest("button[data-dias]");
+    if (!b) return;
+    ctlDias = Number(b.getAttribute("data-dias")) || 7;
+    Array.prototype.forEach.call(ctlPeriodo.querySelectorAll("button"), function (x) {
+      x.classList.toggle("activo", x === b);
+    });
+    if (ctlUltimaRespuesta) ctlPintarGraficas(ctlUltimaRespuesta.tendencias || []);
+  });
+
+  document.getElementById("ctl-acciones").addEventListener("click", function (ev) {
+    var b = ev.target.closest("button[data-comando]");
+    if (!b || b.disabled) return;
+    var confirmar = b.getAttribute("data-confirmar");
+    if (confirmar && !window.confirm(confirmar)) return;
+    var comando = b.getAttribute("data-comando");
+    var argumento = b.getAttribute("data-fecha") === "1"
+      ? document.getElementById("ctl-fecha").value : "";
+    b.disabled = true;
+    ctlMensaje.innerHTML = '<span class="apagado">Enviando <code>/' + esc(comando) +
+      (argumento ? " " + esc(argumento) : "") + '</code>…</span>';
+    google.script.run
+      .withSuccessHandler(function (r) {
+        b.disabled = false;
+        ctlMensaje.innerHTML = r && r.ok
+          ? '<span style="color:var(--bien)">✅ ' + esc(r.mensaje) + '</span>'
+          : '<span style="color:var(--mal)">❌ ' + esc(r && r.mensaje || "No se pudo enviar.") + '</span>';
+        cargarControl(true);
+      })
+      .withFailureHandler(function (e) {
+        b.disabled = false;
+        ctlMensaje.innerHTML = '<span style="color:var(--mal)">❌ No se pudo enviar la orden.</span>';
+      })
+      .solicitarControl(comando, argumento);
+  });
+
+  cargarControl(false);
+  setInterval(function () {
+    if (document.visibilityState === "visible") cargarControl(true);
+  }, 15000);
+
   /* ---------- cartera ---------- */
   google.script.run
     .withSuccessHandler(function (r) {
@@ -672,7 +1139,7 @@
         '</div>' +
         '<div style="margin-top:1rem">' + barra + "</div>";
     })
-    .withFailureHandler(function (e) { cartera.innerHTML = fallo(e && e.message || e); })
+    .withFailureHandler(function () { cartera.innerHTML = fallo("Ocurrió un error inesperado. Recarga la consola."); })
     .cargarResumen();
 
   /* ---------- la lista del día ---------- */
@@ -852,7 +1319,7 @@
 
   google.script.run
     .withSuccessHandler(function (r) { listaCargada = r; pintarLista(); })
-    .withFailureHandler(function (e) { zonaLista.innerHTML = fallo(e && e.message || e); })
+    .withFailureHandler(function () { zonaLista.innerHTML = fallo("Ocurrió un error inesperado. Recarga la consola."); })
     .listaDelDia();
 
   /* ---------- dinero ---------- */
@@ -965,7 +1432,7 @@
       })
       .withFailureHandler(function (e) {
         botonListo();
-        if (!silencioso) zonaDinero.innerHTML = fallo(e && e.message || e);
+        if (!silencioso) zonaDinero.innerHTML = fallo("Ocurrió un error inesperado. Recarga la consola.");
       })
       .dineroDelDia(dias);
   }
@@ -1064,7 +1531,7 @@
                " · último " + esc(x.ultimo) + "</span></div>" + asuntos + "</div>";
       }).join("");
     })
-    .withFailureHandler(function (e) { zonaCorreo.innerHTML = fallo(e && e.message || e); })
+    .withFailureHandler(function () { zonaCorreo.innerHTML = fallo("Ocurrió un error inesperado. Recarga la consola."); })
     .inventarioCorreo();
 
   /* ---------- ficha ---------- */
@@ -1109,6 +1576,59 @@
            '<div class="lista">' + filas + mas + "</div></details>";
   }
 
+  function pintarLineasRecibo(h) {
+    if (!h) return "";
+    if (!h.disponible) {
+      return '<div class="aviso"><span class="r">Historial temporalmente no disponible</span>' +
+        '<p class="chico">El resumen operativo de arriba sigue siendo válido.</p></div>';
+    }
+    if (!h.lineas || !h.lineas.length) return "";
+    var filas = h.lineas.map(function (r) {
+      return '<div class="recibo"><span class="f">' + esc(r.fecha || "") + "</span>" +
+        '<span class="m">' + (r.pagado ? plata(r.pagado) : "—") + "</span>" +
+        '<span class="t">' + esc(r.recibo || "sin referencia") + " · " +
+        esc(r.tipo || "") + (r.debe > 0 ? " · due " + plata(r.debe) : "") +
+        "</span></div>";
+    }).join("");
+    var avisos = "";
+    if (h.reciboRepetido) {
+      avisos += '<div class="mas">Una referencia repetida representa varias líneas financieras, no otro pago.</div>';
+    }
+    if (h.truncado) {
+      avisos += '<div class="mas">Se muestran ' + h.mostradas + " de " + h.total + " líneas.</div>";
+    }
+    return '<details class="recibos"><summary>Líneas del recibo · ' + h.mostradas +
+      " de " + h.total + '</summary><div class="lista">' + filas + avisos + "</div></details>";
+  }
+
+  function pintarTerminosPoliza(h) {
+    if (!h) return "";
+    if (!h.disponible) {
+      return '<div class="aviso"><span class="r">Términos históricos temporalmente no disponibles</span>' +
+        '<p class="chico">La póliza operativa de arriba sigue siendo válida.</p></div>';
+    }
+    if (!h.terminos || !h.terminos.length) return "";
+    var filas = h.terminos.map(function (t) {
+      var periodo = (t.desde || "sin inicio") + " → " + (t.vence || "sin vencimiento");
+      var detalle = [t.carrier, t.estado, t.lob].filter(Boolean).map(esc).join(" · ");
+      if (t.brokerFee) detalle += (detalle ? " · " : "") + "BF " + plata(t.brokerFee);
+      if (t.requiereRevision) detalle += (detalle ? " · " : "") + "revisar candidatas";
+      return '<div class="recibo"><span class="f">' + esc(periodo) + "</span>" +
+        '<span class="m">' + (t.prima ? plata(t.prima) : "—") + "</span>" +
+        '<span class="t">' + detalle + "</span></div>";
+    }).join("");
+    var avisos = "";
+    if (h.ambiguos) {
+      avisos += '<div class="mas">' + h.ambiguos +
+        " término(s) tienen observaciones contradictorias y requieren revisión.</div>";
+    }
+    if (h.truncado) {
+      avisos += '<div class="mas">Se muestran ' + h.mostradas + " de " + h.total + " términos.</div>";
+    }
+    return '<details class="recibos"><summary>Términos de póliza · ' + h.mostradas +
+      " de " + h.total + '</summary><div class="lista">' + filas + avisos + "</div></details>";
+  }
+
   function pintarPoliza(f) {
     var clases = "poliza";
     if (/cancel/i.test(f.estado)) clases += " cancelada";
@@ -1130,7 +1650,9 @@
     return '<div class="' + clases + '">' +
       '<div class="etiquetas">' + etiquetasPoliza(f) + "</div>" +
       '<div class="datos">' + datos + "</div>" +
+      pintarTerminosPoliza(f.terminosPoliza) +
       pintarRecibos(f.pagos) +
+      pintarLineasRecibo(f.lineasRecibo) +
       "</div>";
   }
 
@@ -1198,9 +1720,9 @@
       })
       .withFailureHandler(function (err) {
         boton.disabled = false;
-        zona.innerHTML = fallo(err && err.message || err);
+        zona.innerHTML = fallo("Ocurrió un error inesperado. Recarga la consola.");
       })
-      .buscar(q, nombreRespaldo || "");
+      .buscar(q, nombreRespaldo || "", true, true);
   }
 
   form.addEventListener("submit", buscar);
