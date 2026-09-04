@@ -46,6 +46,7 @@ export default async (request) => {
     return json(200, { ...cached.data, cached: true });
   }
 
+  let upstreamMeta = "sin respuesta";
   try {
     const base = process.env.INTERCOAST_BOT_API_URL;
     const token = process.env.INTERCOAST_CALENDAR_PANEL_TOKEN;
@@ -73,6 +74,18 @@ export default async (request) => {
      * cuerpo, no ese encabezado: se rechaza HTML explícitamente y solo después
      * se intenta parsear JSON. */
     const output = await response.text();
+    let finalHost = "desconocido";
+    try {
+      finalHost = new URL(response.url).hostname;
+    } catch {
+      // La URL solo se usa como metadato de diagnóstico, nunca como contrato.
+    }
+    upstreamMeta = [
+      `status=${response.status}`,
+      `host=${finalHost}`,
+      `tipo=${response.headers.get("content-type") || "sin-tipo"}`,
+      `bytes=${output.length}`,
+    ].join(" ");
     if (/^\s*</.test(output)) {
       throw new Error("Google Calendar devolvió una página en vez de datos.");
     }
@@ -88,7 +101,7 @@ export default async (request) => {
     return json(200, { ...data, cached: false });
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown";
-    console.error(`Admin calendar error: ${message}`);
+    console.error(`Admin calendar error: ${message}; ${upstreamMeta}`);
     if (cached) return json(200, { ...cached.data, cached: true, stale: true });
     return json(502, { error: `No se pudo cargar el calendario: ${message}` });
   }
