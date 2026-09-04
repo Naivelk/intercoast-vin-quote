@@ -5,6 +5,7 @@ import {
   Bot,
   CalendarDays,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock3,
@@ -238,8 +239,18 @@ type ZelleData = {
     nombre: string;
     monto: number;
     nota: string;
+    agente?: string;
   }>;
 };
+const ZELLE_AGENT_ORDER = [
+  "ALEQUIM",
+  "NATALIA",
+  "SUSAN",
+  "GERRY",
+  "KARLA",
+  "CELINA",
+  "SIN ASIGNAR",
+];
 type CalendarEvent = {
   title: string;
   start: string;
@@ -1758,10 +1769,126 @@ export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }
   const desactualizadas = control?.ok
     ? (control.fuentes || []).filter((f) => f.estado === "DESACTUALIZADO").length
     : null;
+  const atenciones = [
+    problemas
+      ? {
+          id: "procesos",
+          nivel: "Urgente",
+          titulo: `${problemas} ${problemas === 1 ? "proceso necesita" : "procesos necesitan"} revisión`,
+          detalle: "Abre Control del bot para ver la causa antes de intervenir.",
+          destino: "control",
+          tono: "rose",
+        }
+      : null,
+    desactualizadas
+      ? {
+          id: "fuentes",
+          nivel: "Revisar",
+          titulo: `${desactualizadas} ${desactualizadas === 1 ? "fuente está" : "fuentes están"} desactualizada${desactualizadas === 1 ? "" : "s"}`,
+          detalle: "Confirma si el reporte esperado llegó a Entrada Karla.",
+          destino: "control",
+          tono: "amber",
+        }
+      : null,
+    faltan.length
+      ? {
+          id: "cobertura",
+          nivel: "Dato pendiente",
+          titulo: `${faltan.length} de ${operacion?.diasPedidos || 0} días del mes sin medir`,
+          detalle:
+            medidos > 0
+              ? `Las cifras actuales corresponden a ${medidos} ${medidos === 1 ? "día medido" : "días medidos"}.`
+              : "Todavía no hay cifras que se puedan presentar como cero.",
+          destino: "operacion",
+          tono: "blue",
+        }
+      : null,
+  ].filter(Boolean) as Array<{
+    id: string;
+    nivel: string;
+    titulo: string;
+    detalle: string;
+    destino: string;
+    tono: "rose" | "amber" | "blue";
+  }>;
 
   return (
     <div className="flex flex-col gap-5">
       <LoadingBar active={loading} />
+
+      {/* ── Primero la decisión: qué necesita atención ── */}
+      <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[.12em] text-blue-700">
+              Prioridad de hoy
+            </p>
+            <h3 className="mt-1 text-lg font-black text-slate-950">
+              Qué necesita atención
+            </h3>
+          </div>
+          {!loading && (
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-black ${
+                atenciones.length
+                  ? "bg-amber-100 text-amber-800"
+                  : "bg-emerald-100 text-emerald-800"
+              }`}
+            >
+              {atenciones.length ? `${atenciones.length} por revisar` : "Todo operativo"}
+            </span>
+          )}
+        </div>
+
+        {loading ? (
+          <div className="p-5">
+            <EsqueletoFilas cuantas={2} etiqueta="Ordenando las prioridades" />
+          </div>
+        ) : atenciones.length ? (
+          <div className="divide-y divide-slate-100">
+            {atenciones.map((item) => {
+              const colores = {
+                rose: "bg-rose-50 text-rose-800 border-rose-200",
+                amber: "bg-amber-50 text-amber-800 border-amber-200",
+                blue: "bg-blue-50 text-blue-800 border-blue-200",
+              }[item.tono];
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => onNavigate(item.destino)}
+                  className="group flex w-full items-start gap-3 px-5 py-4 text-left transition hover:bg-slate-50"
+                >
+                  <span className={`mt-0.5 rounded-lg border px-2 py-1 text-[10px] font-black uppercase tracking-wide ${colores}`}>
+                    {item.nivel}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-black text-slate-950">
+                      {item.titulo}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-slate-500">
+                      {item.detalle}
+                    </span>
+                  </span>
+                  <ChevronRight
+                    size={17}
+                    className="mt-1 shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-blue-700"
+                  />
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 px-5 py-4 text-emerald-800">
+            <CheckCircle2 size={20} className="shrink-0" />
+            <div>
+              <p className="text-sm font-black">No hay alertas operativas ahora</p>
+              <p className="mt-0.5 text-xs text-emerald-700">
+                Los procesos y las fuentes disponibles están al día.
+              </p>
+            </div>
+          </div>
+        )}
+      </section>
 
       {/* ── La franja de cifras ── */}
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -1799,27 +1926,6 @@ export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }
           tone={desactualizadas ? "amber" : "green"}
         />
       </section>
-
-      {/* ── Lo que falta, arriba y en grande ── */}
-      {!loading && operacion && faltan.length > 0 && (
-        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4">
-          <div className="flex items-start gap-3">
-            <AlertTriangle size={19} className="mt-0.5 shrink-0 text-amber-700" />
-            <div className="min-w-0">
-              <p className="text-sm font-black text-amber-900">
-                Faltan {faltan.length} de {operacion.diasPedidos} días del mes por medir.
-              </p>
-              <p className="mt-1 text-sm text-amber-800">
-                {medidos > 0
-                  ? `Las cifras son de los ${medidos} días medidos, no del mes entero. `
-                  : ""}
-                Un día sin fila puede ser un día sin ventas o uno que nadie ha medido:
-                desde aquí no se distinguen.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── Las oficinas ── */}
       <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
@@ -3521,6 +3627,8 @@ export function NativeConsole() {
 export function NativeZelle() {
   const [data, setData] = useState<ZelleData | null>(() => readCache("zelle"));
   const [query, setQuery] = useState("");
+  const [agentFilter, setAgentFilter] = useState("Todos");
+  const [dayFilter, setDayFilter] = useState("Todos");
   const [loading, setLoading] = useState(!data);
   const [error, setError] = useState("");
   const started = useRef(false);
@@ -3554,8 +3662,42 @@ export function NativeZelle() {
     started.current = true;
     void load(false);
   }, []);
-  const payments = (data?.pagos || []).filter((item) =>
-    `${item.nombre} ${item.monto}`.toLowerCase().includes(query.toLowerCase()),
+  const allPayments = data?.pagos || [];
+  const days = Array.from(new Set(allPayments.map((item) => item.fecha))).sort(
+    (a, b) => b.localeCompare(a),
+  );
+  const matchesSearchAndDay = allPayments.filter(
+    (item) =>
+      (dayFilter === "Todos" || item.fecha === dayFilter) &&
+      `${item.nombre} ${item.monto} ${item.agente || ""}`
+        .toLowerCase()
+        .includes(query.toLowerCase()),
+  );
+  const agentOf = (item: (typeof allPayments)[number]) =>
+    String(item.agente || "SIN ASIGNAR").trim().toUpperCase() || "SIN ASIGNAR";
+  const emptyAgentSummaries = Object.fromEntries(
+    ZELLE_AGENT_ORDER.map((agent) => [agent, { count: 0, total: 0 }]),
+  ) as Record<string, { count: number; total: number }>;
+  const agentSummaries = Object.entries(
+    matchesSearchAndDay.reduce<Record<string, { count: number; total: number }>>(
+      (result, item) => {
+        const agent = agentOf(item);
+        const current = result[agent] || { count: 0, total: 0 };
+        current.count += 1;
+        current.total += Number(item.monto || 0);
+        result[agent] = current;
+        return result;
+      },
+      emptyAgentSummaries,
+    ),
+  ).sort(
+    ([a], [b]) =>
+      (ZELLE_AGENT_ORDER.indexOf(a) < 0 ? 99 : ZELLE_AGENT_ORDER.indexOf(a)) -
+        (ZELLE_AGENT_ORDER.indexOf(b) < 0 ? 99 : ZELLE_AGENT_ORDER.indexOf(b)) ||
+      a.localeCompare(b),
+  );
+  const payments = matchesSearchAndDay.filter(
+    (item) => agentFilter === "Todos" || agentOf(item) === agentFilter,
   );
   const groups = payments.reduce<Record<string, typeof payments>>(
     (result, item) => {
@@ -3611,7 +3753,7 @@ export function NativeZelle() {
           <Metric
             label="Total visible"
             value={money(total)}
-            hint="Suma de la búsqueda"
+            hint="Suma de los filtros"
             tone="green"
           />
           <Metric
@@ -3620,6 +3762,90 @@ export function NativeZelle() {
             hint={data?.generada || "Preparando datos"}
             tone="amber"
           />
+        </div>
+
+        {/* El manager audita primero por persona y luego baja al pago. El dato
+            ya venía del proyecto privado; aquí solo se organiza, no se amplía
+            lo que se publica a los agentes. */}
+        <div className="mt-6 rounded-2xl border border-violet-100 bg-white/70 p-4 md:p-5">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[.12em] text-violet-600">
+                Resumen para auditoría
+              </p>
+              <h4 className="mt-1 text-lg font-black text-violet-950">
+                Por agente
+              </h4>
+              <p className="mt-1 text-xs text-slate-500">
+                Toca una tarjeta para ver únicamente sus pagos.
+              </p>
+            </div>
+            {agentFilter !== "Todos" && (
+              <button
+                onClick={() => setAgentFilter("Todos")}
+                className="rounded-xl bg-violet-100 px-3 py-2 text-xs font-black text-violet-800 hover:bg-violet-200"
+              >
+                Ver todos
+              </button>
+            )}
+          </div>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {agentSummaries.map(([agent, summary]) => {
+              const active = agentFilter === agent;
+              return (
+                <button
+                  key={agent}
+                  onClick={() => setAgentFilter(active ? "Todos" : agent)}
+                  aria-pressed={active}
+                  className={`rounded-2xl border p-3.5 text-left transition ${
+                    active
+                      ? "border-violet-600 bg-violet-700 text-white shadow-md"
+                      : agent === "SIN ASIGNAR"
+                        ? "border-amber-200 bg-amber-50 text-amber-950 hover:border-amber-400"
+                        : "border-violet-100 bg-white text-violet-950 hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-sm"
+                  }`}
+                >
+                  <span className={`block text-[10px] font-black uppercase tracking-wide ${active ? "text-violet-200" : "text-violet-500"}`}>
+                    {agent}
+                  </span>
+                  <strong className="mt-1.5 block text-xl tabular-nums">
+                    {money(summary.total)}
+                  </strong>
+                  <span className={`mt-1 block text-xs ${active ? "text-violet-100" : "text-slate-500"}`}>
+                    {summary.count} {summary.count === 1 ? "pago" : "pagos"} · Ver detalle
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="mt-5 overflow-x-auto pb-1">
+          <div className="flex min-w-max gap-2">
+            <button
+              onClick={() => {
+                setDayFilter("Todos");
+                setAgentFilter("Todos");
+              }}
+              aria-pressed={dayFilter === "Todos"}
+              className={`rounded-xl px-3.5 py-2 text-xs font-black transition ${dayFilter === "Todos" ? "bg-violet-700 text-white" : "border border-violet-100 bg-white text-violet-700 hover:border-violet-300"}`}
+            >
+              Todos los días
+            </button>
+            {days.map((day) => (
+              <button
+                key={day}
+                onClick={() => {
+                  setDayFilter(dayFilter === day ? "Todos" : day);
+                  setAgentFilter("Todos");
+                }}
+                aria-pressed={dayFilter === day}
+                className={`rounded-xl px-3.5 py-2 text-xs font-black transition ${dayFilter === day ? "bg-violet-700 text-white" : "border border-violet-100 bg-white text-violet-700 hover:border-violet-300"}`}
+              >
+                {day}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="relative mt-5">
           <Search
@@ -3686,6 +3912,23 @@ export function NativeZelle() {
               <EsqueletoFilas cuantas={4} etiqueta="Preparando los pagos" />
             </div>
           )}
+          {!loading && data && !payments.length && (
+            <div className="rounded-2xl border border-dashed border-violet-200 bg-white/70 px-5 py-10 text-center">
+              <p className="text-sm font-black text-violet-950">
+                No hay pagos con estos filtros
+              </p>
+              <button
+                onClick={() => {
+                  setAgentFilter("Todos");
+                  setDayFilter("Todos");
+                  setQuery("");
+                }}
+                className="mt-3 rounded-xl bg-violet-100 px-4 py-2 text-xs font-black text-violet-800"
+              >
+                Limpiar filtros
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </section>
@@ -3731,6 +3974,50 @@ const officeBoundary = (date: Date) => {
   return `${day}T00:00:00${sign}${hour}:${minute}`;
 };
 
+type CalendarKind =
+  | "Todos"
+  | "PEND X CANCE"
+  | "OPEN SUSPENSE"
+  | "RENEWAL"
+  | "CALLBRIGHT"
+  | "NB"
+  | "ENDO"
+  | "OTROS";
+
+const CALENDAR_KINDS: CalendarKind[] = [
+  "Todos",
+  "PEND X CANCE",
+  "OPEN SUSPENSE",
+  "RENEWAL",
+  "CALLBRIGHT",
+  "NB",
+  "ENDO",
+  "OTROS",
+];
+
+function calendarKind(event: CalendarEvent): Exclude<CalendarKind, "Todos"> {
+  const title = event.title.toUpperCase();
+  if (/PEND(?:IENTE)?\s*X\s*CANCE|CANCELA/.test(title)) return "PEND X CANCE";
+  if (/OPEN\s*SUSPEN/.test(title)) return "OPEN SUSPENSE";
+  if (/RENEW|RENOV/.test(title)) return "RENEWAL";
+  if (/CALL\s*BRI|CALLBRI/.test(title)) return "CALLBRIGHT";
+  if (/(^|\s)NB(?:\s|$)/.test(title)) return "NB";
+  if (/ENDO/.test(title)) return "ENDO";
+  return "OTROS";
+}
+
+function calendarKindClass(kind: Exclude<CalendarKind, "Todos">) {
+  return {
+    "PEND X CANCE": "bg-rose-100 text-rose-800",
+    "OPEN SUSPENSE": "bg-amber-100 text-amber-800",
+    RENEWAL: "bg-blue-100 text-blue-800",
+    CALLBRIGHT: "bg-violet-100 text-violet-800",
+    NB: "bg-emerald-100 text-emerald-800",
+    ENDO: "bg-cyan-100 text-cyan-800",
+    OTROS: "bg-slate-100 text-slate-700",
+  }[kind];
+}
+
 export function NativeCalendar() {
   const [week, setWeek] = useState(() => startOfWeek(new Date()));
   const cacheKey = `calendar-${isoDay(week)}`;
@@ -3740,6 +4027,10 @@ export function NativeCalendar() {
   const [loading, setLoading] = useState(!data);
   const [query, setQuery] = useState("");
   const [calendar, setCalendar] = useState("Todos");
+  const [kind, setKind] = useState<CalendarKind>("Todos");
+  const [expandedDays, setExpandedDays] = useState<Set<string>>(
+    () => new Set([officeDay(new Date())]),
+  );
   const [error, setError] = useState("");
   const end = addDays(week, 7);
   const days = Array.from({ length: 7 }, (_, index) => addDays(week, index));
@@ -3778,12 +4069,28 @@ export function NativeCalendar() {
     void load(false);
   }, [week.getTime()]);
 
-  const visible = (data?.events || []).filter(
+  useEffect(() => {
+    const keys = days.map(isoDay);
+    const officeToday = officeDay(new Date());
+    setExpandedDays(
+      new Set([keys.includes(officeToday) ? officeToday : keys[0]]),
+    );
+  }, [week.getTime()]);
+
+  const matching = (data?.events || []).filter(
     (event) =>
       (calendar === "Todos" || event.calendar === calendar) &&
       `${event.title} ${event.calendar}`
         .toLowerCase()
         .includes(query.toLowerCase()),
+  );
+  const kindCounts = matching.reduce<Record<string, number>>((counts, event) => {
+    const eventKind = calendarKind(event);
+    counts[eventKind] = (counts[eventKind] || 0) + 1;
+    return counts;
+  }, {});
+  const visible = matching.filter(
+    (event) => kind === "Todos" || calendarKind(event) === kind,
   );
   const byDay = visible.reduce<Record<string, CalendarEvent[]>>(
     (result, event) => {
@@ -3793,7 +4100,15 @@ export function NativeCalendar() {
     },
     {},
   );
-  const today = isoDay(new Date());
+  const today = officeDay(new Date());
+  const toggleDay = (key: string) =>
+    setExpandedDays((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  const allExpanded = days.every((day) => expandedDays.has(isoDay(day)));
   return (
     <section className="mt-6 space-y-5">
       <div className="rounded-3xl bg-gradient-to-r from-blue-800 via-indigo-800 to-violet-800 p-6 text-white shadow-xl md:p-8">
@@ -3878,68 +4193,156 @@ export function NativeCalendar() {
           Google Calendar <ExternalLink size={14} />
         </a>
       </div>
-      <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-sm">
-        <div className="grid min-w-[1180px] grid-cols-7 divide-x divide-slate-100">
+      <div className="overflow-x-auto pb-1">
+        <div className="flex min-w-max gap-2">
+          {CALENDAR_KINDS.map((option) => {
+            const count = option === "Todos" ? matching.length : kindCounts[option] || 0;
+            return (
+              <button
+                key={option}
+                onClick={() => setKind(option)}
+                aria-pressed={kind === option}
+                className={`rounded-xl px-3.5 py-2 text-xs font-black transition ${
+                  kind === option
+                    ? "bg-blue-700 text-white shadow-sm"
+                    : "border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-700"
+                }`}
+              >
+                {option} · {count}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Una semana de 200+ eventos no cabe en siete columnas útiles. Cada día
+          enseña su carga y solo abre el detalle cuando se necesita; hoy abre
+          primero. En móvil es la misma pieza, sin una tabla horizontal. */}
+      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 md:px-5">
+          <div>
+            <p className="text-sm font-black text-slate-950">Semana por día</p>
+            <p className="text-xs text-slate-500">
+              Abre solo el día que vas a revisar.
+            </p>
+          </div>
+          <button
+            onClick={() =>
+              setExpandedDays(
+                allExpanded ? new Set() : new Set(days.map(isoDay)),
+              )
+            }
+            className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-700 hover:bg-blue-50 hover:text-blue-700"
+          >
+            {allExpanded ? "Plegar todos" : "Expandir todos"}
+          </button>
+        </div>
+        <div className="divide-y divide-slate-100">
           {days.map((day) => {
             const key = isoDay(day);
-            const events = byDay[key] || [];
+            const events = (byDay[key] || []).sort(
+              (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
+            );
             const isToday = key === today;
+            const expanded = expandedDays.has(key);
+            const dayKinds = events.reduce<Record<string, number>>((counts, event) => {
+              const eventKind = calendarKind(event);
+              counts[eventKind] = (counts[eventKind] || 0) + 1;
+              return counts;
+            }, {});
             return (
-              <section key={key} className="min-h-[650px]">
-                <header
-                  className={`sticky top-0 z-10 border-b border-slate-100 p-3 ${isToday ? "bg-blue-700 text-white" : "bg-slate-50 text-slate-700"}`}
+              <section key={key}>
+                <button
+                  onClick={() => toggleDay(key)}
+                  aria-expanded={expanded}
+                  className={`flex w-full items-center gap-3 px-4 py-4 text-left transition md:px-5 ${
+                    isToday ? "bg-blue-700 text-white hover:bg-blue-800" : "hover:bg-slate-50"
+                  }`}
                 >
-                  <p className="text-[11px] font-black uppercase tracking-wider">
-                    {new Intl.DateTimeFormat("es", { weekday: "short" }).format(
-                      day,
-                    )}
-                  </p>
-                  <div className="mt-1 flex items-end justify-between">
-                    <span className="text-2xl font-black">{day.getDate()}</span>
-                    <span
-                      className={`rounded-full px-2 py-1 text-[10px] font-black ${isToday ? "bg-white/20" : "bg-white"}`}
-                    >
-                      {events.length}
+                  <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl ${isToday ? "bg-white/15" : "bg-slate-100 text-slate-900"}`}>
+                    <span className="text-lg font-black leading-none">{day.getDate()}</span>
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-black capitalize">
+                      {new Intl.DateTimeFormat("es", {
+                        weekday: "long",
+                        month: "short",
+                        day: "numeric",
+                      }).format(day)}
+                      {isToday ? " · Hoy" : ""}
                     </span>
+                    <span className={`mt-1 flex flex-wrap gap-1.5 ${isToday ? "text-blue-100" : "text-slate-500"}`}>
+                      {Object.entries(dayKinds)
+                        .sort(([, a], [, b]) => b - a)
+                        .slice(0, 3)
+                        .map(([eventKind, count]) => (
+                          <span key={eventKind} className="text-[10px] font-bold">
+                            {eventKind} {count}
+                          </span>
+                        ))}
+                      {!events.length && <span className="text-xs">Sin eventos</span>}
+                    </span>
+                  </span>
+                  <span className={`rounded-full px-3 py-1 text-xs font-black ${isToday ? "bg-white/15" : "bg-slate-100 text-slate-700"}`}>
+                    {events.length}
+                  </span>
+                  <ChevronDown
+                    size={19}
+                    className={`shrink-0 transition ${expanded ? "rotate-180" : ""}`}
+                  />
+                </button>
+
+                {expanded && (
+                  <div className="bg-slate-50/70 p-3 md:p-5">
+                    {events.length ? (
+                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                        {events.map((event, index) => {
+                          const eventKind = calendarKind(event);
+                          return (
+                            <a
+                              key={`${event.start}-${event.title}-${index}`}
+                              href={event.link || "#"}
+                              target={event.link ? "_blank" : undefined}
+                              rel="noreferrer"
+                              className="block rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
+                              style={{
+                                borderLeftWidth: 4,
+                                borderLeftColor: event.color || "#2563eb",
+                              }}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <span className={`rounded-md px-2 py-1 text-[9px] font-black uppercase tracking-wide ${calendarKindClass(eventKind)}`}>
+                                  {eventKind}
+                                </span>
+                                <ExternalLink size={13} className="shrink-0 text-slate-400" />
+                              </div>
+                              <p className="mt-3 line-clamp-3 text-sm font-black leading-snug text-slate-900">
+                                {event.title}
+                              </p>
+                              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-bold text-slate-500">
+                                <span className="inline-flex items-center gap-1">
+                                  <Clock3 size={12} />
+                                  {event.allDay
+                                    ? "Todo el día"
+                                    : new Intl.DateTimeFormat("es", {
+                                        hour: "numeric",
+                                        minute: "2-digit",
+                                        timeZone: OFFICE_TIME_ZONE,
+                                      }).format(new Date(event.start))}
+                                </span>
+                                <span className="truncate">{event.calendar}</span>
+                              </div>
+                            </a>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="py-8 text-center text-sm text-slate-500">
+                        No hay eventos con estos filtros.
+                      </p>
+                    )}
                   </div>
-                </header>
-                <div className="max-h-[650px] space-y-2 overflow-auto p-2">
-                  {events.map((event, index) => (
-                    <a
-                      key={`${event.start}-${event.title}-${index}`}
-                      href={event.link || "#"}
-                      target={event.link ? "_blank" : undefined}
-                      rel="noreferrer"
-                      className="block rounded-xl border border-slate-100 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
-                      style={{
-                        borderLeftWidth: 4,
-                        borderLeftColor: event.color || "#2563eb",
-                      }}
-                    >
-                      <p className="line-clamp-3 text-xs font-black leading-snug text-slate-900">
-                        {event.title}
-                      </p>
-                      <p className="mt-2 flex items-center gap-1 text-[10px] font-bold text-slate-500">
-                        <Clock3 size={11} />
-                        {event.allDay
-                          ? "Todo el día"
-                          : new Intl.DateTimeFormat("es", {
-                              hour: "numeric",
-                              minute: "2-digit",
-                              timeZone: OFFICE_TIME_ZONE,
-                            }).format(new Date(event.start))}
-                      </p>
-                      <p className="mt-1 truncate text-[10px] text-slate-400">
-                        {event.calendar}
-                      </p>
-                    </a>
-                  ))}
-                  {!events.length && (
-                    <p className="py-10 text-center text-xs text-slate-400">
-                      Sin eventos
-                    </p>
-                  )}
-                </div>
+                )}
               </section>
             );
           })}
