@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useLanguage } from '../hooks/useLanguage';
 import QuoteFormReact from './QuoteFormReact';
 import MascotImage from './eva/MascotImage';
@@ -8,80 +8,6 @@ import { WORLD_CUP_SEASON } from '../constants/worldCupTheme';
 
 const QuoteForm: React.FC = () => {
   const { t } = useLanguage();
-
-  // Asegurar que el iframe se cargue correctamente en producción
-  useEffect(() => {
-    // Añadir estilos específicos para el iframe
-    const style = document.createElement('style');
-    style.textContent = `
-      .form-iframe {
-        width: 100%;
-        min-height: 1000px;
-        border: none;
-        margin: 0;
-        padding: 0;
-        display: block;
-        overflow: hidden;
-      }
-      @media (max-width: 768px) {
-        .form-iframe {
-          min-height: 1100px;
-        }
-      }
-      
-      /* Estilos para el formulario dentro del iframe */
-      body, html {
-        margin: 0;
-        padding: 0;
-        width: 100%;
-      }
-      
-      .container {
-        padding: 0;
-        width: 100%;
-        max-width: 100%;
-        margin: 0;
-      }
-      
-      #formulario {
-        padding: 1.5rem;
-        max-width: 100%;
-      }
-      
-      .form-header {
-        margin-bottom: 1.5rem;
-        text-align: center;
-      }
-      
-      .form-header h2 {
-        font-size: 1.75rem;
-        margin-bottom: 0.5rem;
-        color: #1f2937;
-      }
-      
-      .form-header p {
-        font-size: 1.1rem;
-        color: #4b5563;
-      }
-      
-      /* Ajustar los elementos del formulario */
-      label, input, select, button {
-        width: 100%;
-        max-width: 100%;
-        box-sizing: border-box;
-      }
-    `;
-    document.head.appendChild(style);
-
-    return () => {
-      document.head.removeChild(style);
-    };
-  }, []);
-
-  // Usar URL absoluta para producción y relativa para desarrollo
-  const formUrl = import.meta.env.PROD
-    ? '/formulario/index.html' 
-    : '/formulario/index.html';
 
   // Datos de beneficios/promociones con iconos temáticos de seguros
   const benefits = [

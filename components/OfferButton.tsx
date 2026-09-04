@@ -1,21 +1,22 @@
 import React from 'react';
-import { useLanguage } from '../hooks/useLanguage';
-import { TagIcon } from './icons';
+import { FaWhatsapp } from 'react-icons/fa';
 
 const OfferButton: React.FC = () => {
-  const { t } = useLanguage();
+  const whatsappUrl =
+    'https://wa.me/15623787804?text=Hola%2C%20necesito%20ayuda%20con%20un%20seguro%20de%20Intercoast%20Insurance.';
 
   return (
-    <div className="fixed bottom-6 right-24 z-40 sm:bottom-8 sm:right-28">
-      <div 
-        className="bg-[#2ECC71] text-white py-3 px-6 rounded-full inline-flex items-center gap-3 shadow-2xl hover:shadow-2xl hover:scale-105 transition-all duration-300 transform hover:rotate-[-2deg] animate-pulse cursor-pointer"
-        onClick={() => {
-          document.getElementById('quote-form')?.scrollIntoView({ behavior: 'smooth' });
-        }}
+    <div className="fixed bottom-6 right-28 z-[55] hidden md:block sm:bottom-8">
+      <a
+        href={whatsappUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Hablar con Intercoast Insurance por WhatsApp"
+        title="WhatsApp"
+        className="group grid h-14 w-14 place-items-center rounded-full bg-[#25D366] text-white shadow-2xl transition-all duration-300 hover:-translate-y-1 hover:scale-105 hover:bg-[#20bd5a] hover:shadow-[0_16px_40px_rgba(37,211,102,0.35)] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#25D366]/35"
       >
-        <TagIcon className="h-6 w-6" />
-        <p className="font-bold text-lg">{t('hero.offer')}</p>
-      </div>
+        <FaWhatsapp className="h-8 w-8 transition-transform duration-300 group-hover:rotate-6 group-hover:scale-110" />
+      </a>
     </div>
   );
 };
