@@ -16,6 +16,59 @@ const json = (status, body) =>
 
 const memory = globalThis.__intercoastToolCache || new Map();
 globalThis.__intercoastToolCache = memory;
+
+/* ═══ EL CACHÉ QUE SOBREVIVE A LA INSTANCIA ══════════════════════════════════
+ *
+ * `memory` vive en el `globalThis` de **esta** instancia de la función. Un
+ * arranque en frío lo pierde, así que el primero que abre el panel por la
+ * mañana paga la llamada entera al bot: medido, `cargarResumen` son ~4 s y
+ * `listaDelDia` ~2,5 s.
+ *
+ * Con un almacén persistente eso también sale del caché. Pero aquí cuelga el
+ * puente del que vive TODO el panel, así que:
+ *
+ *   ⚠️ **Si Blobs falla por lo que sea, esto se comporta exactamente como
+ *   antes.** El import es dinámico, cada lectura y cada escritura van en su
+ *   `try`, y ningún fallo se propaga. El peor caso posible es no mejorar.
+ *
+ * Nunca sustituye a `memory`: se usan los dos. La memoria es más rápida cuando
+ * la instancia está caliente; el almacén es el que salva el arranque en frío.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+let almacenPromesa;
+async function almacen() {
+  if (almacenPromesa === undefined) {
+    almacenPromesa = (async () => {
+      try {
+        const { getStore } = await import("@netlify/blobs");
+        return getStore("intercoast-panel");
+      } catch {
+        return null;
+      }
+    })();
+  }
+  return almacenPromesa;
+}
+
+async function leerDelAlmacen(clave) {
+  try {
+    const s = await almacen();
+    if (!s) return null;
+    const crudo = await s.get(clave, { type: "json" });
+    return crudo && typeof crudo.savedAt === "number" ? crudo : null;
+  } catch {
+    return null;
+  }
+}
+
+async function guardarEnAlmacen(clave, data, savedAt) {
+  try {
+    const s = await almacen();
+    if (!s) return;
+    await s.setJSON(clave, { data, savedAt });
+  } catch {
+    /* En silencio: el caché es una mejora, no un requisito. */
+  }
+}
 const CACHE_TTL = {
   "consola:cargarResumen": 10 * 60 * 1000,
   "consola:listaDelDia": 3 * 60 * 1000,
@@ -74,6 +127,17 @@ export default async (request) => {
         return json(200, { ...cached.data, cached: true });
       }
 
+      /* La instancia está fría o el dato caducó en memoria: puede que otra
+       * instancia ya lo haya pedido hace poco. Se mira el almacén antes de
+       * molestar al bot, y se recalienta la memoria con lo que traiga. */
+      if (!body.force && ttl) {
+        const guardado = await leerDelAlmacen(cacheKey);
+        if (guardado && Date.now() - guardado.savedAt < ttl) {
+          memory.set(cacheKey, guardado);
+          return json(200, { ...guardado.data, cached: true });
+        }
+      }
+
       const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -83,7 +147,13 @@ export default async (request) => {
         }),
       });
       const data = await response.json();
-      if (data.ok && ttl) memory.set(cacheKey, { data, savedAt: Date.now() });
+      if (data.ok && ttl) {
+        const savedAt = Date.now();
+        memory.set(cacheKey, { data, savedAt });
+        /* Sin `await`: guardar es una cortesía para la próxima instancia, no
+         * algo que deba hacer esperar a quien ya tiene su respuesta. */
+        void guardarEnAlmacen(cacheKey, data, savedAt);
+      }
       return json(data.ok ? 200 : 502, { ...data, cached: false });
     } catch (error) {
       console.error("Admin tool call failed", {

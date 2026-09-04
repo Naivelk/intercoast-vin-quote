@@ -15,6 +15,7 @@ import {
   SystemControl,
   TodayHome,
   precargarPanel,
+  precargarVista,
 } from "./admin/NativeWorkspaces";
 import {
   AuditEntry,
@@ -886,6 +887,25 @@ export default function AdminPanel() {
     const t = setTimeout(() => void precargarPanel(), 1500);
     return () => clearTimeout(t);
   }, []);
+
+  /* Y lo mantiene fresco mientras el panel siga abierto, cada diez minutos.
+   *
+   * Diez a propósito: es el mismo tiempo que el puente guarda las lecturas
+   * quietas, así que buena parte de las veces ni llega a molestar al bot. Si lo
+   * deja abierto toda la mañana, los números no envejecen y no tiene que pulsar
+   * «Actualizar» nunca.
+   *
+   * ⚠️ Solo con la pestaña **visible**: refrescar un panel que nadie está
+   * mirando es gastar cuota de Apps Script por nada. */
+  useEffect(() => {
+    const cada = window.setInterval(
+      () => {
+        if (document.visibilityState === "visible") void precargarPanel();
+      },
+      10 * 60 * 1000,
+    );
+    return () => window.clearInterval(cada);
+  }, []);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
@@ -1213,6 +1233,11 @@ export default function AdminPanel() {
                 <button
                   key={item.id}
                   onClick={() => setView(item.id)}
+                  /* Entre que el cursor toca esto y llega el clic pasan unos
+                   * cientos de milisegundos: se aprovechan para ir pidiendo.
+                   * `onFocus` además para quien navega con el teclado. */
+                  onMouseEnter={() => precargarVista(item.id)}
+                  onFocus={() => precargarVista(item.id)}
                   aria-current={view === item.id ? "page" : undefined}
                   className="ic-enlace"
                 >
@@ -1307,6 +1332,8 @@ export default function AdminPanel() {
             <button
               key={item.id}
               onClick={() => setView(item.id)}
+              onMouseEnter={() => precargarVista(item.id)}
+              onFocus={() => precargarVista(item.id)}
               className={`whitespace-nowrap rounded-xl px-3.5 py-2 text-sm font-bold transition ${view === item.id ? "bg-[#0057d9] text-white" : "ic-apagado bg-white/70"}`}
             >
               {item.label}

@@ -709,11 +709,22 @@ function operationRange(period: OperationPeriod, reference: Date) {
  *
  * Solo lee. Los números salen de la pestaña que publica el bot.
  */
+/** La clave del caché de esta vista. Una por rango: cambiar de día o de mes es
+ *  otra pregunta, y mezclarlas enseñaría números de otra semana. */
+const claveOperacion = (desde: string, hasta: string) =>
+  `operacion-${desde}-${hasta}`;
+
 export function OfficeOperation() {
   const [period, setPeriod] = useState<OperationPeriod>("dia");
   const [reference, setReference] = useState<Date>(() => new Date());
-  const [data, setData] = useState<OfficeOperationData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const primerRango = useMemo(() => operationRange("dia", new Date()), []);
+  /* Esta vista era la única sin caché: `useState(null)` y `setLoading(true)`
+   * fijo, así que **esperaba siempre**, todas las veces, aunque acabaras de
+   * verla. Y está en el grupo que el propio panel llama «lo que más se mira». */
+  const [data, setData] = useState<OfficeOperationData | null>(() =>
+    readCache(claveOperacion(primerRango.desde, primerRango.hasta)),
+  );
+  const [loading, setLoading] = useState(!data);
   const [error, setError] = useState("");
 
   const range = useMemo(
@@ -722,7 +733,11 @@ export function OfficeOperation() {
   );
 
   const load = async (selected = range) => {
-    setLoading(true);
+    const clave = claveOperacion(selected.desde, selected.hasta);
+    const guardado = readCache<OfficeOperationData>(clave);
+    if (guardado) setData(guardado);
+    /* Con algo que enseñar, el refresco va callado. Ver la nota de `loadPart`. */
+    if (!guardado) setLoading(true);
     try {
       const value = await callTool<OfficeOperationData>(
         "consola",
@@ -736,9 +751,13 @@ export function OfficeOperation() {
             : value.error || "No se pudo leer la operación.",
         );
       setData(value);
+      writeCache(claveOperacion(selected.desde, selected.hasta), value);
       setError("");
     } catch (reason) {
-      setData(null);
+      /* ⚠️ Si había algo guardado, se deja en pantalla con el error al lado. No
+       * se pone `null`: borrar lo último que se supo, para dejar el hueco vacío,
+       * es perder información sin ganar nada. */
+      if (!readCache(claveOperacion(selected.desde, selected.hasta))) setData(null);
       setError(
         reason instanceof Error
           ? reason.message
@@ -3679,5 +3698,57 @@ export async function precargarPanel() {
   for (const [clave, traer] of tareas) {
     await precargarUna(clave, traer);
     await pausa();
+  }
+}
+
+/* ═══ PRECARGA AL PASAR EL RATÓN ═════════════════════════════════════════════
+ *
+ * Entre que el cursor toca un elemento del menú y llega el clic pasan unos
+ * cientos de milisegundos. Lanzar ahí la petición no adelanta el dato entero
+ * —contra el bot son 2 a 4 segundos, medido— pero sí se come el principio, y es
+ * lo que queda por rascar cuando la precarga de fondo aún no ha llegado a esa
+ * ventana.
+ *
+ * Se apoya en lo mismo que todo lo demás: si ya está fresco no pide nada.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+const yaPedido = new Set<string>();
+
+/** Adelanta lo de una ventana concreta. Silencioso y sin repetir. */
+export function precargarVista(vista: string) {
+  if (yaPedido.has(vista)) return;
+  yaPedido.add(vista);
+  /* El olvido es a propósito y corto: si vuelve a pasar el ratón un minuto
+   * después, el dato ya no es el mismo y merece otra oportunidad. */
+  setTimeout(() => yaPedido.delete(vista), 60000);
+
+  if (vista === "zelle") {
+    void precargarUna("zelle", () => callTool("zelle", "datos", []));
+    return;
+  }
+  if (vista === "consola") {
+    void precargarUna("console-summary", () =>
+      callTool("consola", "cargarResumen", []),
+    );
+    return;
+  }
+  if (vista === "operacion") {
+    const r = operationRange("dia", new Date());
+    void precargarUna(claveOperacion(r.desde, r.hasta), () =>
+      callTool("consola", "operacionPorOficina", [r.desde, r.hasta]),
+    );
+    return;
+  }
+  if (vista === "calendario") {
+    const semana = startOfWeek(new Date());
+    void precargarUna(`calendar-${isoDay(semana)}`, async () => {
+      const fin = addDays(semana, 7);
+      const r = await fetch(
+        `/api/admin/calendar?start=${encodeURIComponent(officeBoundary(semana))}&end=${encodeURIComponent(officeBoundary(fin))}`,
+        { credentials: "include" },
+      );
+      const v = await r.json();
+      return r.ok && v.ok ? v : null;
+    });
   }
 }
