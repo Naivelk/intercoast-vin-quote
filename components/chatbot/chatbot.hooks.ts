@@ -755,14 +755,19 @@ export const useChatbot = (initialMessage?: string): ChatbotContextType & { isOp
           await addBotMessage({ content: chatbotConfig.messages.homePolicyInfo, type: 'suggestion', options: [chatbotConfig.messages.quoteThisPolicy, chatbotConfig.messages.seeOtherPolicies, chatbotConfig.messages.backToMenu] });
           newUserData.currentStep = steps.POLICY_DETAIL;
           response = '';
-        } else if (lower.includes('vida')) {
-          await addBotMessage({ content: chatbotConfig.messages.lifePolicyInfo, type: 'suggestion', options: [chatbotConfig.messages.quoteThisPolicy, chatbotConfig.messages.seeOtherPolicies, chatbotConfig.messages.backToMenu] });
-          newUserData.currentStep = steps.POLICY_DETAIL;
-          response = '';
-        } else if (lower.includes('salud')) {
-          await addBotMessage({ content: chatbotConfig.messages.healthPolicyInfo, type: 'suggestion', options: [chatbotConfig.messages.quoteThisPolicy, chatbotConfig.messages.seeOtherPolicies, chatbotConfig.messages.backToMenu] });
-          newUserData.currentStep = steps.POLICY_DETAIL;
-          response = '';
+        /* Aquí había dos ramas más, para «vida» y «salud», que usaban
+         * `lifePolicyInfo` y `healthPolicyInfo`. Esos dos mensajes NO existen en
+         * `chatbot.config.ts`, así que quien escribiera «vida» o «salud» recibía
+         * `undefined` como respuesta del bot, en la web pública.
+         *
+         * No se alcanzaban desde el menú —solo ofrece Auto y Hogar— pero sí
+         * escribiéndolo a mano. Se quitan porque **la agencia no vende esos
+         * seguros**, confirmado por el dueño el 4 de septiembre de 2026: quien
+         * los escriba cae ahora en el flujo normal, que sí sabe responder.
+         *
+         * Si algún día se venden, no basta con reponer las ramas: hay que
+         * escribir los mensajes con las coberturas reales y añadir la opción al
+         * menú, porque hoy ni siquiera se ofrecen. */
         } else if (lower.includes('volver')) {
           response = {
             content: chatbotConfig.welcomeMessage,

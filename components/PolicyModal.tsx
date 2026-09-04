@@ -144,7 +144,7 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ isOpen, onClose, policy }) =>
                         <div className="h-full w-full relative overflow-hidden">
                           <img
                             src={image.src}
-                            alt={t(image.altKey)}
+                            alt={t<string>(image.altKey)}
                             className="w-full h-full object-cover transition-transform duration-700 ease-in-out group-hover:scale-105"
                             loading="lazy"
                             onError={(e) => {
@@ -163,13 +163,13 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ isOpen, onClose, policy }) =>
                   {/* Controles de navegación personalizados */}
                   <button 
                     className="swiper-button-prev absolute left-4 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white text-gray-800 p-2 rounded-full shadow-lg focus:outline-none transition-all duration-300 opacity-0 group-hover:opacity-100 hover:scale-110"
-                    aria-label={t('carousel.previous')}
+                    aria-label={t<string>('carousel.previous')}
                   >
                     <ChevronLeftIcon className="h-6 w-6" />
                   </button>
                   <button 
                     className="swiper-button-next absolute right-4 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white text-gray-800 p-2 rounded-full shadow-lg focus:outline-none transition-all duration-300 opacity-0 group-hover:opacity-100 hover:scale-110"
-                    aria-label={t('carousel.next')}
+                    aria-label={t<string>('carousel.next')}
                   >
                     <ChevronRightIcon className="h-6 w-6" />
                   </button>

@@ -181,7 +181,15 @@ export function estimatePriceFromConfig(v: VehicleLike): number {
     }
   }
   const key = canonicalBodyClass(v.bodyClass);
-  let base = rateConfig.baseByBodyClass[key] || rateConfig.baseByBodyClass['Other'];
+  /* `canonicalBodyClass` devuelve `string`, y puede devolver una clase que la
+   * tabla no tenga: para eso está el `|| 'Other'`, que es la guarda de verdad y
+   * la que evita un `NaN` en el precio.
+   *
+   * El índice se declara aquí en vez de ampliar el tipo de la tabla, para que
+   * escribir mal una clave literal en `baseByBodyClass` **siga siendo un error**
+   * y no quede tapado por un `Record<string, number>` global. */
+  const tarifas = rateConfig.baseByBodyClass as Record<string, number | undefined>;
+  let base = tarifas[key] || rateConfig.baseByBodyClass['Other'];
   base *= rateConfig.adjusters.year(v.year || '');
   base *= rateConfig.adjusters.fuel(v.fuelType || '');
   base *= rateConfig.adjusters.engineHp(v.engineHP || '');

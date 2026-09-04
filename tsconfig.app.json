@@ -1,0 +1,30 @@
+{
+  "// por qué existe": [
+    "El `tsconfig.json` del proyecto tiene `include: [\"src\"]`, y `src/` solo",
+    "contiene dos ficheros de declaración: `env.d.ts` y `vite-env.d.ts`. Todo el",
+    "código real vive en la raíz y en `components/` — 32 componentes.",
+    "",
+    "Es decir: durante todo este tiempo `npx tsc --noEmit` ha salido en verde sin",
+    "mirar ni una línea de la aplicación. Ya había mordido una vez con el panel de",
+    "administración (ver `tsconfig.admin.json`); esto es lo mismo un piso más",
+    "arriba, y se descubrió el 4 de septiembre de 2026 al ir a revisar los 7",
+    "errores que aquel fichero daba por conocidos.",
+    "",
+    "Los 7 estaban arreglados ese mismo día y esto quedó en CERO. Se deja puesto",
+    "para que siga en cero: un chequeo que nadie puede poner en verde se acaba",
+    "ignorando, y uno que nadie corre es peor todavía.",
+    "",
+    "Se corre con `npm run typecheck`."
+  ],
+  "extends": "./tsconfig.json",
+  "include": [
+    "*.ts",
+    "*.tsx",
+    "src",
+    "components",
+    "hooks",
+    "services",
+    "pricing",
+    "netlify/functions"
+  ]
+}
