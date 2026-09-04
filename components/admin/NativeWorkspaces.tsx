@@ -522,6 +522,106 @@ function EsqueletoFilas({
   );
 }
 
+/* ═══ ESTADOS VACÍOS ═════════════════════════════════════════════════════════
+ *
+ * «Todavía no hay registros para este periodo» en gris, centrado, es correcto y
+ * se lee como un error. Un dibujo pequeño cambia el tono: **esto está bien, no
+ * es que se haya roto algo** — que es justo lo que hay que decir cuando un día
+ * no tiene movimiento.
+ *
+ * Los dibujos van en SVG dentro del propio fichero: ni una petición de red más,
+ * ni un archivo que se pueda perder al desplegar, y **heredan `currentColor`**,
+ * así que funcionan igual en el tema claro y en el oscuro sin dos versiones.
+ *
+ * ⚠️ Un estado vacío NO es un estado de carga. Este componente sale cuando ya
+ * se sabe que no hay nada; mientras se carga van los esqueletos. Confundirlos
+ * haría decir «no hay datos» de algo que todavía venía en camino.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+type DibujoVacio = "agenda" | "dinero" | "busqueda" | "calma";
+
+function Dibujo({ cual }: { cual: DibujoVacio }) {
+  const trazo = {
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.6,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+  return (
+    <svg
+      viewBox="0 0 96 72"
+      className="h-20 w-24 text-[color:var(--ic-azul)] opacity-70"
+      aria-hidden="true"
+    >
+      {cual === "agenda" && (
+        <>
+          <rect x="18" y="14" width="60" height="46" rx="6" {...trazo} />
+          <path d="M18 26h60M32 8v10M64 8v10" {...trazo} />
+          <path d="M30 38h14M30 48h26" {...trazo} opacity={0.45} />
+          <circle cx="66" cy="44" r="9" {...trazo} opacity={0.5} />
+          <path d="M66 40v4l3 2" {...trazo} opacity={0.5} />
+        </>
+      )}
+      {cual === "dinero" && (
+        <>
+          <rect x="12" y="22" width="72" height="34" rx="6" {...trazo} />
+          <circle cx="48" cy="39" r="9" {...trazo} />
+          <path d="M48 34v10M45 36.5h6M45 41.5h6" {...trazo} opacity={0.6} />
+          <path d="M22 30v18M74 30v18" {...trazo} opacity={0.35} />
+        </>
+      )}
+      {cual === "busqueda" && (
+        <>
+          <circle cx="42" cy="34" r="17" {...trazo} />
+          <path d="M55 47l13 13" {...trazo} />
+          <path d="M34 34h16M34 40h10" {...trazo} opacity={0.45} />
+        </>
+      )}
+      {cual === "calma" && (
+        <>
+          <path d="M14 52h68" {...trazo} />
+          <path d="M24 52c0-10 6-16 12-16s12 6 12 16" {...trazo} opacity={0.55} />
+          <path d="M50 52c0-7 4-11 8-11s8 4 8 11" {...trazo} opacity={0.4} />
+          <circle cx="70" cy="22" r="7" {...trazo} opacity={0.6} />
+        </>
+      )}
+    </svg>
+  );
+}
+
+/**
+ * El hueco cuando no hay nada que enseñar, y **no es un fallo**.
+ *
+ * `motivo` es la línea que explica por qué está vacío. Cuando el vacío tiene un
+ * significado que se puede confundir con un cero —«no hay días medidos» no es
+ * «los días valen cero»— esa distinción va aquí, no en la cabeza de quien mira.
+ */
+function Vacio({
+  dibujo = "calma",
+  titulo,
+  motivo,
+  accion,
+}: {
+  dibujo?: DibujoVacio;
+  titulo: string;
+  motivo?: React.ReactNode;
+  accion?: React.ReactNode;
+}) {
+  return (
+    <div className="grid place-items-center px-6 py-12 text-center">
+      <Dibujo cual={dibujo} />
+      <p className="mt-4 text-sm font-black text-slate-700">{titulo}</p>
+      {motivo ? (
+        <p className="mt-1.5 max-w-md text-sm leading-relaxed text-slate-500">
+          {motivo}
+        </p>
+      ) : null}
+      {accion ? <div className="mt-4">{accion}</div> : null}
+    </div>
+  );
+}
+
 function readCache<T>(key: string): T | null {
   try {
     const raw = localStorage.getItem(`intercoast:${key}`);
@@ -977,33 +1077,43 @@ export function OfficeOperation() {
         {/* Sin ningún día medido no se pinta ni una cifra: un cero aquí sería
             una afirmación que nadie ha comprobado. */}
         {!error && data?.publicada !== false && oficinas.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-            <p className="text-sm font-black text-slate-700">
-              No hay ningún día medido en este periodo.
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              No se muestran cifras porque no las hay — no porque valgan cero.
-            </p>
-            {cobertura ? (
-              <div className="mt-4">
-                <p className="text-sm text-slate-600">
-                  Lo medido va del{" "}
-                  <strong className="text-slate-900">{cobertura.desde}</strong> al{" "}
-                  <strong className="text-slate-900">{cobertura.hasta}</strong> ·{" "}
-                  {cobertura.dias} {cobertura.dias === 1 ? "día" : "días"}.
-                </p>
-                <button
-                  onClick={irAlUltimoMedido}
-                  className="mt-3 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-black text-white hover:bg-slate-700"
-                >
-                  Ver el {cobertura.hasta}
-                </button>
-              </div>
-            ) : (
-              <p className="mt-3 text-sm text-slate-500">
-                La pestaña todavía no tiene ni un día medido.
-              </p>
-            )}
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50">
+            <Vacio
+              dibujo="dinero"
+              titulo="No hay ningún día medido en este periodo"
+              motivo={
+                <>
+                  No se muestran cifras porque no las hay — no porque valgan
+                  cero.
+                  {cobertura ? (
+                    <>
+                      {" "}
+                      Lo medido va del{" "}
+                      <strong className="text-slate-900">
+                        {cobertura.desde}
+                      </strong>{" "}
+                      al{" "}
+                      <strong className="text-slate-900">
+                        {cobertura.hasta}
+                      </strong>{" "}
+                      · {cobertura.dias} {cobertura.dias === 1 ? "día" : "días"}.
+                    </>
+                  ) : (
+                    " La pestaña todavía no tiene ni un día medido."
+                  )}
+                </>
+              }
+              accion={
+                cobertura ? (
+                  <button
+                    onClick={irAlUltimoMedido}
+                    className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-black text-white hover:bg-slate-700"
+                  >
+                    Ver el {cobertura.hasta}
+                  </button>
+                ) : null
+              }
+            />
           </div>
         )}
 
@@ -1326,11 +1436,12 @@ function AttendanceControl() {
               })}
               {!loading && !data?.filas.length && (
                 <tr>
-                  <td
-                    colSpan={6}
-                    className="px-4 py-10 text-center text-sm text-slate-500"
-                  >
-                    Todavía no hay registros para este periodo.
+                  <td colSpan={6}>
+                    <Vacio
+                      dibujo="agenda"
+                      titulo="Todavía no hay registros para este periodo"
+                      motivo="En cuanto alguien marque entrada aparecerá aquí."
+                    />
                   </td>
                 </tr>
               )}
@@ -1375,9 +1486,11 @@ function ControlTrendChart({
 }) {
   if (!data.length) {
     return (
-      <div className="grid h-40 place-items-center text-sm font-semibold text-slate-400">
-        Todavía no hay historial suficiente.
-      </div>
+      <Vacio
+        dibujo="calma"
+        titulo="Todavía no hay historial suficiente"
+        motivo="La gráfica aparece cuando haya varios días medidos con los que comparar."
+      />
     );
   }
   const width = 620;
@@ -1637,19 +1750,27 @@ export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }
         </div>
 
         {!loading && !oficinas.length ? (
-          <div className="m-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-            <p className="text-sm font-black text-slate-700">
-              No hay ningún día medido en este mes.
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              No se muestran cifras porque no las hay — no porque valgan cero.
-            </p>
-            {cobertura && (
-              <p className="mt-3 text-sm text-slate-600">
-                Lo medido va del <strong>{cobertura.desde}</strong> al{" "}
-                <strong>{cobertura.hasta}</strong>.
-              </p>
-            )}
+          <div className="m-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50">
+            {/* ⚠️ El motivo importa tanto como el título: «no hay días medidos»
+                NO es «los días valen cero», y esa diferencia es la regla del
+                panel entero. Va escrita, no en la cabeza de quien mira. */}
+            <Vacio
+              dibujo="dinero"
+              titulo="No hay ningún día medido en este mes"
+              motivo={
+                <>
+                  No se muestran cifras porque no las hay — no porque valgan
+                  cero.
+                  {cobertura ? (
+                    <>
+                      {" "}
+                      Lo medido va del <strong>{cobertura.desde}</strong> al{" "}
+                      <strong>{cobertura.hasta}</strong>.
+                    </>
+                  ) : null}
+                </>
+              }
+            />
           </div>
         ) : (
           <div className="grid gap-px bg-slate-100 md:grid-cols-2">
@@ -2948,11 +3069,21 @@ export function NativeConsole() {
                 </div>
               ))
             ) : (
-              <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">
-                {searchResult.nota ||
-                  searchResult.mensaje ||
-                  "No encontramos resultados."}
-              </p>
+              /* Este es el vacío que más va a ver: buscar un cliente y que no
+                 salga. El motivo que devuelve la consola manda —a veces dice
+                 algo útil, como que el nombre era ambiguo—; solo si no dice
+                 nada se pone el texto genérico. */
+              <div className="rounded-xl bg-slate-50">
+                <Vacio
+                  dibujo="busqueda"
+                  titulo="No encontramos ese cliente"
+                  motivo={
+                    searchResult.nota ||
+                    searchResult.mensaje ||
+                    "Prueba con el teléfono completo, o con el nombre tal y como está en la póliza."
+                  }
+                />
+              </div>
             )}
           </div>
         )}
