@@ -68,11 +68,20 @@ export default async (request) => {
       }),
       signal: AbortSignal.timeout(55000),
     });
-    const contentType = response.headers.get("content-type") || "";
-    if (!contentType.toLowerCase().includes("application/json")) {
+    /* Apps Script puede conservar `text/plain` después de la redirección aun
+     * cuando ContentService recibió MimeType.JSON. El contrato lo prueba el
+     * cuerpo, no ese encabezado: se rechaza HTML explícitamente y solo después
+     * se intenta parsear JSON. */
+    const output = await response.text();
+    if (/^\s*</.test(output)) {
+      throw new Error("Google Calendar devolvió una página en vez de datos.");
+    }
+    let data;
+    try {
+      data = JSON.parse(output);
+    } catch {
       throw new Error("Google Calendar devolvió una respuesta inválida.");
     }
-    const data = await response.json();
     if (!data.ok)
       throw new Error(data.error || "Google Calendar no respondió.");
     memory.set(key, { data, savedAt: Date.now() });
