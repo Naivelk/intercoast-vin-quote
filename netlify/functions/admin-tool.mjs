@@ -138,13 +138,26 @@ export default async (request) => {
         }
       }
 
+      /* El reloj de asistencia de la página de Zelle pide identificarse y
+       * tener la jornada abierta: es un control para los seis agentes. El
+       * manager no ficha, así que su panel se quedaba en «Identificación
+       * requerida» viendo cero pagos.
+       *
+       * Quien demuestra aquí quién llama es esta misma función, arriba: el
+       * correo contra `ALLOWED_EMAILS`. Este token solo transporta esa prueba
+       * hasta Apps Script, que no puede ver la sesión de Netlify. Va en el
+       * cuerpo y NO en la URL, y nunca sale de esta función — el navegador no
+       * lo ve. Sin la variable de entorno no se manda nada y el reloj sigue
+       * pidiendo identificación como antes. */
+      const cuerpo = { action, args: JSON.stringify(args) };
+      if (tool === "zelle" && process.env.INTERCOAST_ZELLE_PANEL_TOKEN) {
+        cuerpo.panel = process.env.INTERCOAST_ZELLE_PANEL_TOKEN;
+      }
+
       const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          action,
-          args: JSON.stringify(args),
-        }),
+        body: new URLSearchParams(cuerpo),
       });
       const data = await response.json();
       if (data.ok && ttl) {
