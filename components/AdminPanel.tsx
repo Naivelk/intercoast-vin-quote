@@ -1141,6 +1141,21 @@ export default function AdminPanel() {
   const unassigned = leads.filter(
     (lead) => !lead.asesor && !["Vendido", "Perdido"].includes(lead.estado),
   ).length;
+
+  /* La insignia llama la atención **solo cuando sube**: un lead nuevo sin
+   * asignar es algo que acaba de pasar. Si baja —porque alguien lo asignó— no
+   * hay nada que anunciar, y llamar ahí enseñaría a ignorar la insignia. */
+  const [insigniaLlama, setInsigniaLlama] = useState(false);
+  const antesSinAsignar = useRef(unassigned);
+  useEffect(() => {
+    if (unassigned > antesSinAsignar.current) {
+      setInsigniaLlama(true);
+      const t = setTimeout(() => setInsigniaLlama(false), 2800);
+      antesSinAsignar.current = unassigned;
+      return () => clearTimeout(t);
+    }
+    antesSinAsignar.current = unassigned;
+  }, [unassigned]);
   const urgentCases = (retention?.cases || []).filter(
     (item) => Number(item.Prioridad || item.Score || item.score || 0) >= 90,
   ).length;
@@ -1261,7 +1276,13 @@ export default function AdminPanel() {
                 >
                   {item.icon}
                   <span className="truncate">{item.label}</span>
-                  {item.badge ? <span className="ic-insignia">{item.badge}</span> : null}
+                  {item.badge ? (
+                    <span
+                      className={`ic-insignia${insigniaLlama && item.id === "leads" ? " ic-llama" : ""}`}
+                    >
+                      {item.badge}
+                    </span>
+                  ) : null}
                 </button>
               ))}
             </div>

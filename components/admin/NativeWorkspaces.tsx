@@ -684,12 +684,104 @@ async function callTool<T>(
   return data.result as T;
 }
 
+/* ═══ LAS CIFRAS SUBEN CUANDO CAMBIAN ════════════════════════════════════════
+ *
+ * Un número que se sustituye de golpe no se nota. Uno que sube en 450 ms dice
+ * dos cosas a la vez: **esto acaba de cambiar** y **hacia dónde**.
+ *
+ * ⚠️ **Solo cuando cambia de verdad.** Con el refresco callado cada diez
+ * minutos, animar cada vez sería un panel que parpadea solo. Si el valor es el
+ * mismo, no se mueve nada.
+ *
+ * ⚠️ Y **jamás en el primer pintado con dato guardado**: si al abrir el panel
+ * las seis cifras se pusieran a contar desde cero, durante medio segundo el
+ * dinero del día valdría 0. En un panel de dinero eso no es una animación
+ * bonita, es una cifra falsa en pantalla.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+function useCifraQueSube(valor: number) {
+  const [visible, setVisible] = useState(valor);
+  const anterior = useRef(valor);
+  const primera = useRef(true);
+
+  useEffect(() => {
+    /* La primera vez se planta el número y ya: sin cuenta atrás desde cero. */
+    if (primera.current) {
+      primera.current = false;
+      anterior.current = valor;
+      setVisible(valor);
+      return;
+    }
+    if (valor === anterior.current) return;
+
+    const quieto = window.matchMedia?.(
+      "(prefers-reduced-motion: reduce)",
+    )?.matches;
+    if (quieto) {
+      anterior.current = valor;
+      setVisible(valor);
+      return;
+    }
+
+    const desde = anterior.current;
+    const salto = valor - desde;
+    anterior.current = valor;
+    const t0 = performance.now();
+    let vivo = true;
+
+    const paso = (ahora: number) => {
+      if (!vivo) return;
+      const t = Math.min(1, (ahora - t0) / 450);
+      /* Frena al final: el ojo lee el número justo cuando se para. */
+      const suave = 1 - Math.pow(1 - t, 3);
+      setVisible(desde + salto * suave);
+      if (t < 1) requestAnimationFrame(paso);
+    };
+    requestAnimationFrame(paso);
+    return () => {
+      vivo = false;
+    };
+  }, [valor]);
+
+  return visible;
+}
+
+/**
+ * Una cifra que sube al cambiar. `formato` decide cómo se escribe cada paso —
+ * dinero, entero, porcentaje— para que nunca se vea un decimal a medias.
+ */
+function CifraViva({
+  valor,
+  formato = (n: number) => String(Math.round(n)),
+  className = "",
+}: {
+  valor: number;
+  formato?: (n: number) => string;
+  className?: string;
+}) {
+  const visible = useCifraQueSube(Number.isFinite(valor) ? valor : 0);
+  return <span className={className}>{formato(visible)}</span>;
+}
+
+/**
+ * La barra de «se está actualizando».
+ *
+ * Era un bloque que latía en el sitio: un pulso no dice si algo avanza o si se
+ * quedó colgado. Una barra que **recorre** sí, y se lee de reojo sin apartar la
+ * vista de lo que se está mirando.
+ *
+ * Ocupa el mismo alto siempre —haya o no carga— para que la cabecera no dé un
+ * salto de un píxel cada vez que empieza y termina un refresco.
+ */
 function LoadingBar({ active }: { active: boolean }) {
-  return active ? (
-    <div className="h-1 overflow-hidden bg-blue-100">
-      <div className="h-full w-1/3 animate-[pulse_1s_ease-in-out_infinite] rounded-full bg-blue-600" />
+  return (
+    <div
+      className="h-[3px] overflow-hidden bg-white/10"
+      role={active ? "progressbar" : undefined}
+      aria-label={active ? "Actualizando" : undefined}
+    >
+      {active ? <div className="ic-progreso h-full w-2/5 rounded-full" /> : null}
     </div>
-  ) : null;
+  );
 }
 
 function Metric({
@@ -716,7 +808,16 @@ function Metric({
         <p className="text-[11px] font-black uppercase tracking-wider text-slate-500">
           {label}
         </p>
-        <p className="ic-cifra mt-2 text-3xl font-black text-slate-950">{value}</p>
+        {/* Sube solo si es un número limpio. Todo lo demás —«—», «$1.234,50»,
+            un texto— se pinta tal cual: animar un formato que no controlamos
+            acabaría enseñando un importe a medio formatear. */}
+        <p className="ic-cifra mt-2 text-3xl font-black text-slate-950">
+          {typeof value === "number" && Number.isFinite(value) ? (
+            <CifraViva valor={value} />
+          ) : (
+            value
+          )}
+        </p>
         <p className="mt-1 text-xs text-slate-500">{hint}</p>
       </div>
     </article>

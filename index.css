@@ -379,3 +379,40 @@ textarea {
   .admin-shell article.shadow-sm:hover,
   .admin-shell section.shadow-sm:hover { transform: none; }
 }
+
+/* ═══ LA BARRA QUE RECORRE ═══════════════════════════════════════════════════
+ *
+ * Un bloque que late en el sitio no dice si algo avanza o si se quedó colgado.
+ * Uno que recorre, sí — y se lee de reojo sin apartar la vista de lo que se
+ * está mirando.
+ *
+ * Va en dorado sobre las cabeceras de marca, que son azules: el azul sobre azul
+ * no se veía.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+@keyframes ic-recorre {
+  0%   { transform: translateX(-110%); }
+  100% { transform: translateX(360%); }
+}
+.ic-progreso {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--ic-oro) 35%,
+    #fff2c4 55%,
+    var(--ic-oro) 75%,
+    transparent 100%
+  );
+  animation: ic-recorre 1.15s cubic-bezier(.45, 0, .3, 1) infinite;
+}
+
+/* ═══ LA INSIGNIA DE URGENTES LLAMA UNA VEZ ══════════════════════════════════
+ *
+ * Un número que cambia en una esquina no se ve. Tres latidos y para: algo que
+ * palpita sin fin se convierte en ruido y se deja de mirar, que es justo lo
+ * contrario de lo que se busca.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+@keyframes ic-late {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 193, 7, .55); }
+  50%      { transform: scale(1.12); box-shadow: 0 0 0 6px rgba(255, 193, 7, 0); }
+}
+.ic-insignia.ic-llama { animation: ic-late 900ms ease-out 3; }
