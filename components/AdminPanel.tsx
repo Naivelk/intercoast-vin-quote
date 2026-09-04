@@ -222,8 +222,26 @@ function OperationsHub({
         />
       </div>
       {loading ? (
-        <div className="rounded-2xl bg-white p-8 text-slate-500 shadow-sm">
-          Conectando con operación de retención…
+        /* Con la forma de los dos bloques que vienen, para que no salte la
+         * página al llegar y haya algo donde poner los ojos mientras tanto. */
+        <div
+          className="grid gap-6 lg:grid-cols-2"
+          role="status"
+          aria-label="Conectando con la operación"
+        >
+          {Array.from({ length: 2 }, (_, i) => (
+            <div key={i} className="rounded-2xl bg-white p-6 shadow-sm">
+              <div className="h-3 w-28 animate-pulse rounded bg-slate-200/80" />
+              <div className="mt-4 space-y-3">
+                {Array.from({ length: 4 }, (_, j) => (
+                  <div
+                    key={j}
+                    className="h-4 w-full animate-pulse rounded bg-slate-200/70"
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       ) : !data ? (
         <div className="rounded-2xl bg-amber-50 p-6 text-amber-900 shadow-sm">
@@ -1499,7 +1517,18 @@ export default function AdminPanel() {
                 </p>
               </div>
               {loading ? (
-                <p className="p-8 text-slate-500">Cargando leads…</p>
+                <div className="space-y-2 p-4" role="status" aria-label="Cargando leads">
+                  {Array.from({ length: 6 }, (_, i) => (
+                    <div key={i} className="flex items-center gap-3 rounded-xl border border-slate-100 p-3">
+                      <div className="h-8 w-8 shrink-0 animate-pulse rounded-full bg-slate-200/80" />
+                      <div className="min-w-0 flex-1">
+                        <div className="h-3.5 w-1/3 animate-pulse rounded bg-slate-200/80" />
+                        <div className="mt-2 h-3 w-1/2 animate-pulse rounded bg-slate-200/80" />
+                      </div>
+                      <div className="h-6 w-20 shrink-0 animate-pulse rounded bg-slate-200/80" />
+                    </div>
+                  ))}
+                </div>
               ) : (
                 <div className="max-h-[620px] overflow-auto">
                   <table className="w-full text-left text-sm">

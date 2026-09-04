@@ -445,6 +445,83 @@ const moneyExact = (value: number | null | undefined) =>
  * de ayer con el de ahora. Sin esa etiqueta esto sería mentir con números, que
  * es justo lo que el proyecto no hace.
  */
+/* ═══ ESQUELETOS ═════════════════════════════════════════════════════════════
+ *
+ * Un «Preparando los pagos…» centrado en una pantalla vacía hace que la espera
+ * se sienta más larga: no hay nada donde poner los ojos y la página salta
+ * cuando por fin llega el contenido.
+ *
+ * Un esqueleto con la forma de lo que viene hace dos cosas: **reserva el sitio**
+ * —así no salta nada al llegar— y da sensación de avance.
+ *
+ * ⚠️ **Solo cuando no hay NADA que enseñar.** Con dato en pantalla no se pinta
+ * esto: se deja el dato y se refresca callado. Un esqueleto encima de números
+ * buenos sería el mismo error que el spinner que ya se quitó.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+function Hueso({ className = "" }: { className?: string }) {
+  return (
+    <div
+      className={`animate-pulse rounded-lg bg-slate-200/80 ${className}`}
+      aria-hidden="true"
+    />
+  );
+}
+
+/** Varias tarjetas con la forma de las de verdad. */
+function EsqueletoTarjetas({
+  cuantas = 3,
+  etiqueta = "Cargando",
+}: {
+  cuantas?: number;
+  etiqueta?: string;
+}) {
+  return (
+    <div
+      className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+      role="status"
+      aria-label={etiqueta}
+    >
+      {Array.from({ length: cuantas }, (_, i) => (
+        <div
+          key={i}
+          className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"
+        >
+          <Hueso className="h-3 w-24" />
+          <Hueso className="mt-3 h-7 w-32" />
+          <Hueso className="mt-2 h-3 w-20" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Filas de una lista, con su punto y sus dos líneas. */
+function EsqueletoFilas({
+  cuantas = 5,
+  etiqueta = "Cargando",
+}: {
+  cuantas?: number;
+  etiqueta?: string;
+}) {
+  return (
+    <div className="space-y-2" role="status" aria-label={etiqueta}>
+      {Array.from({ length: cuantas }, (_, i) => (
+        <div
+          key={i}
+          className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"
+        >
+          <Hueso className="h-9 w-9 shrink-0 rounded-full" />
+          <div className="min-w-0 flex-1">
+            <Hueso className="h-3.5 w-1/3" />
+            <Hueso className="mt-2 h-3 w-1/2" />
+          </div>
+          <Hueso className="h-6 w-16 shrink-0" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function readCache<T>(key: string): T | null {
   try {
     const raw = localStorage.getItem(`intercoast:${key}`);
@@ -2458,6 +2535,11 @@ export function NativeConsole() {
           {error}
         </div>
       )}
+      {/* Sin resumen ni lista todavía, las cuatro cifras saldrían como «—» y la
+          página saltaría al llegar. Con la forma puesta, no se mueve nada. */}
+      {!summary && !list ? (
+        <EsqueletoTarjetas cuantas={4} etiqueta="Preparando las cifras" />
+      ) : (
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric
           label="Urgentes hoy"
@@ -2483,6 +2565,7 @@ export function NativeConsole() {
           tone="amber"
         />
       </div>
+      )}
 
       <article
         id="buscar"
@@ -3019,9 +3102,9 @@ export function NativeConsole() {
         </div>
         <div className="max-h-[680px] overflow-auto divide-y divide-slate-100">
           {loading.list && !list ? (
-            <p className="p-8 text-center text-sm text-slate-500">
-              Preparando los casos…
-            </p>
+            <div className="p-4">
+              <EsqueletoFilas cuantas={6} etiqueta="Preparando los casos" />
+            </div>
           ) : (
             cases.map((item, index) => (
               <div
@@ -3367,8 +3450,8 @@ export function NativeZelle() {
             </section>
           ))}
           {loading && !data && (
-            <div className="py-20 text-center text-sm font-bold text-violet-600">
-              Preparando los pagos…
+            <div className="py-4">
+              <EsqueletoFilas cuantas={4} etiqueta="Preparando los pagos" />
             </div>
           )}
         </div>
