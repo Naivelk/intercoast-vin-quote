@@ -433,9 +433,21 @@ const moneyExact = (value: number | null | undefined) =>
     maximumFractionDigits: 2,
   }).format(Number(value || 0));
 
+/* ═══ EL CACHÉ DEL PANEL ═══
+ *
+ * Estaba en `sessionStorage`, que **se borra al cerrar la pestaña**: cada vez
+ * que el manager abría el panel, todas las ventanas volvían a estar frías y
+ * había que esperar a cada una. En `localStorage` sobrevive, así que por la
+ * mañana ve los números al instante mientras se refrescan por detrás.
+ *
+ * ⚠️ **Enseñar cifras guardadas obliga a decir de cuándo son.** Para eso está
+ * `cacheAge`: la vista pinta «actualizado hace N min» y nadie confunde el dato
+ * de ayer con el de ahora. Sin esa etiqueta esto sería mentir con números, que
+ * es justo lo que el proyecto no hace.
+ */
 function readCache<T>(key: string): T | null {
   try {
-    const raw = sessionStorage.getItem(`intercoast:${key}`);
+    const raw = localStorage.getItem(`intercoast:${key}`);
     if (!raw) return null;
     return JSON.parse(raw).data as T;
   } catch {
@@ -445,11 +457,36 @@ function readCache<T>(key: string): T | null {
 
 function writeCache<T>(key: string, data: T) {
   try {
-    sessionStorage.setItem(
+    localStorage.setItem(
       `intercoast:${key}`,
       JSON.stringify({ savedAt: Date.now(), data }),
     );
   } catch {}
+}
+
+/** Hace cuántos milisegundos se guardó, o `null` si no hay nada guardado. */
+function cacheAge(key: string): number | null {
+  try {
+    const raw = localStorage.getItem(`intercoast:${key}`);
+    if (!raw) return null;
+    const savedAt = Number(JSON.parse(raw).savedAt);
+    return Number.isFinite(savedAt) ? Date.now() - savedAt : null;
+  } catch {
+    return null;
+  }
+}
+
+/** «hace 4 min» · «hace 2 h» · «ayer». Vacío si no hay dato guardado. */
+function edadLegible(key: string): string {
+  const ms = cacheAge(key);
+  if (ms === null) return "";
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return "hace un momento";
+  if (min < 60) return `hace ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `hace ${h} h`;
+  const d = Math.floor(h / 24);
+  return d === 1 ? "ayer" : `hace ${d} días`;
 }
 
 async function callTool<T>(
@@ -2224,7 +2261,16 @@ export function NativeConsole() {
     cacheKey: string,
     force = false,
   ) => {
-    setLoading((current) => ({ ...current, [key]: true }));
+    /* ⚠️ El spinner solo si NO hay nada que enseñar.
+     *
+     * Antes esto ponía `true` siempre, así que el dato cacheado aparecía y
+     * **desaparecía debajo del spinner** un segundo después: se pagaba la espera
+     * entera teniéndolo ya en pantalla. Con dato, el refresco va callado.
+     *
+     * Con `force` sí se ve: ahí el manager le ha dado a «Actualizar» y espera
+     * una señal de que algo está pasando. */
+    const aCiegas = force || readCache(cacheKey) === null;
+    if (aCiegas) setLoading((current) => ({ ...current, [key]: true }));
     try {
       const value = await callTool<T>("consola", action, args, force);
       setter(value);
@@ -2368,6 +2414,15 @@ export function NativeConsole() {
               separado y conservan su última información mientras llega la
               nueva.
             </p>
+            {/* ⚠️ Enseñar cifras guardadas obliga a decir de cuándo son. El
+                panel arranca con lo de la última vez para no hacer esperar; si
+                no dijera la edad, un número de ayer pasaría por uno de ahora. */}
+            {edadLegible("console-summary") ? (
+              <p className="mt-1 text-xs text-blue-200">
+                Datos guardados de {edadLegible("console-summary")} · se están
+                actualizando
+              </p>
+            ) : null}
           </div>
           <button
             onClick={() => refreshAll(true)}
@@ -3136,7 +3191,10 @@ export function NativeZelle() {
   const [error, setError] = useState("");
   const started = useRef(false);
   const load = async (refresh = false) => {
-    setLoading(true);
+    /* El spinner solo si no hay nada que enseñar, o si lo pidió él. Ver la nota
+     * en `loadPart` de la consola: tapar el dato cacheado hacía pagar la espera
+     * entera teniéndolo ya delante. */
+    if (refresh || !data) setLoading(true);
     setError("");
     try {
       const value = await callTool<ZelleData>(
@@ -3356,7 +3414,11 @@ export function NativeCalendar() {
     const key = `calendar-${isoDay(week)}`;
     const cached = readCache<CalendarPayload>(key);
     if (cached) setData(cached);
-    setLoading(true);
+    /* Aquí estaba lo más llamativo: se leía el caché, se pintaba **y en la línea
+     * siguiente se tapaba con el spinner**. Cambiar de semana enseñaba la semana
+     * guardada un parpadeo y luego a esperar. Ahora, con dato, el refresco es
+     * callado; el spinner queda para cuando no hay nada o él pide actualizar. */
+    if (force || !cached) setLoading(true);
     setError("");
     try {
       const response = await fetch(
@@ -3551,4 +3613,71 @@ export function NativeCalendar() {
       </div>
     </section>
   );
+}
+
+/* ═══ LA PRECARGA ════════════════════════════════════════════════════════════
+ *
+ * El panel guardaba lo que cargaba, así que **volver** a una ventana era rápido.
+ * Lo que dolía era la **primera** visita de cada una: clic en Calendario y a
+ * esperar, clic en Zelle y a esperar, y así con todas.
+ *
+ * Esto las pide en segundo plano nada más entrar, con las mismas claves que
+ * leen las vistas. Cuando el manager hace clic, el dato ya está.
+ *
+ * ⚠️ **Nunca molesta.** Va de una en una y con pausa —no seis peticiones a la
+ * vez—, no toca ningún estado de React y **se traga cualquier error**: si algo
+ * falla, la vista lo pedirá como siempre y él no se entera. Una precarga que
+ * rompa la pantalla es peor que no tenerla.
+ *
+ * Y no repite lo que ya está fresco: el puente cachea diez minutos las lecturas
+ * quietas, así que volver a pedirlas sería gastar por gastar.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+const PRE_FRESCO_MS = 5 * 60 * 1000;
+
+async function precargarUna(clave: string, traer: () => Promise<unknown>) {
+  const edad = cacheAge(clave);
+  if (edad !== null && edad < PRE_FRESCO_MS) return;
+  try {
+    const valor = await traer();
+    if (valor) writeCache(clave, valor);
+  } catch {
+    /* En silencio a propósito: la vista lo pedirá cuando toque. */
+  }
+}
+
+/** Deja listo lo de las otras ventanas mientras el manager mira la primera. */
+export async function precargarPanel() {
+  const pausa = () => new Promise((r) => setTimeout(r, 400));
+
+  /* ⚠️ Aquí NO están `dineroDelDia` ni `inventarioCorreo`, a propósito: los dos
+   * rebuscan en Gmail. Precargarlos los haría correr **cada vez que se abre el
+   * panel**, aunque él no entre nunca a esa ventana, y eso es gastar cuota de
+   * Apps Script —la misma que necesitan las rutinas de la madrugada— para
+   * adelantar algo que quizá nadie mire. Se cargan cuando se abren.
+   *
+   * Lo que sí va son las lecturas quietas: leen una pestaña ya publicada. */
+  const tareas: Array<[string, () => Promise<unknown>]> = [
+    ["console-summary", () => callTool("consola", "cargarResumen", [])],
+    ["console-list", () => callTool("consola", "listaDelDia", [])],
+    ["zelle", () => callTool("zelle", "datos", [])],
+    [
+      `calendar-${isoDay(startOfWeek(new Date()))}`,
+      async () => {
+        const semana = startOfWeek(new Date());
+        const fin = addDays(semana, 7);
+        const r = await fetch(
+          `/api/admin/calendar?start=${encodeURIComponent(officeBoundary(semana))}&end=${encodeURIComponent(officeBoundary(fin))}`,
+          { credentials: "include" },
+        );
+        const v = await r.json();
+        return r.ok && v.ok ? v : null;
+      },
+    ],
+  ];
+
+  for (const [clave, traer] of tareas) {
+    await precargarUna(clave, traer);
+    await pausa();
+  }
 }

@@ -14,6 +14,7 @@ import {
   OfficeOperation,
   SystemControl,
   TodayHome,
+  precargarPanel,
 } from "./admin/NativeWorkspaces";
 import {
   AuditEntry,
@@ -876,6 +877,15 @@ export default function AdminPanel() {
   useEffect(() => {
     if (view === "auditoria") void loadAudit();
   }, [view]);
+
+  /* Deja listo lo de las otras ventanas mientras él mira la primera, para que el
+   * clic siguiente no sea otra espera. Arranca con retraso a propósito: primero
+   * que termine de pintarse la pantalla que tiene delante, y después lo de
+   * detrás. Va en silencio y no puede romper nada — ver `precargarPanel`. */
+  useEffect(() => {
+    const t = setTimeout(() => void precargarPanel(), 1500);
+    return () => clearTimeout(t);
+  }, []);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
