@@ -1807,26 +1807,51 @@ export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }
   const cobertura = operacion?.cobertura || null;
   const trabajando = asistencia?.resumen?.trabajando ?? null;
   const agentes = asistencia?.agentes?.length ?? null;
-  const problemas = control?.ok ? control.problemas : null;
-  const desactualizadas = control?.ok
-    ? (control.fuentes || []).filter((f) => f.estado === "DESACTUALIZADO").length
+  /* `problemas` mezcla fallos actuales, órdenes fallidas, fuentes viejas y
+   * avisos de capacidad. Presentarlo entero como «procesos dañados» hacía que
+   * el inicio dijera 2 aunque las 12 tarjetas estuvieran verdes. */
+  const procesosConFalla = control?.ok
+    ? (control.componentes || []).filter((component) =>
+        ["ERROR", "AVISO", "CONGELADO", "ATRASADO"].includes(component.estado),
+      ).length + (control.ordenes?.errores || 0)
+    : null;
+  const avisosCapacidad = control?.ok
+    ? (control.componentes || []).filter((component) =>
+        ["AVISO", "CRITICO"].includes(component.capacidad?.estado || ""),
+      ).length
+    : null;
+  const fuentesPorRevisar = control?.ok
+    ? (control.fuentes || []).filter((source) =>
+        ["DESACTUALIZADO", "SIN_DISTINGUIR"].includes(source.estado),
+      ).length
     : null;
   const atenciones = [
-    problemas
+    procesosConFalla
       ? {
           id: "procesos",
           nivel: "Urgente",
-          titulo: `${problemas} ${problemas === 1 ? "proceso necesita" : "procesos necesitan"} revisión`,
+          titulo: `${procesosConFalla} ${procesosConFalla === 1 ? "proceso necesita" : "procesos necesitan"} revisión`,
           detalle: "Abre Control del bot para ver la causa antes de intervenir.",
           destino: "control",
           tono: "rose",
         }
       : null,
-    desactualizadas
+    avisosCapacidad
+      ? {
+          id: "capacidad",
+          nivel: "Vigilar",
+          titulo: `${avisosCapacidad} ${avisosCapacidad === 1 ? "proceso se acerca" : "procesos se acercan"} al límite de tiempo`,
+          detalle:
+            "Siguen funcionando; el aviso se activa por su duración histórica, no por un error actual.",
+          destino: "control",
+          tono: "amber",
+        }
+      : null,
+    fuentesPorRevisar
       ? {
           id: "fuentes",
           nivel: "Revisar",
-          titulo: `${desactualizadas} ${desactualizadas === 1 ? "fuente está" : "fuentes están"} desactualizada${desactualizadas === 1 ? "" : "s"}`,
+          titulo: `${fuentesPorRevisar} ${fuentesPorRevisar === 1 ? "fuente necesita" : "fuentes necesitan"} revisión`,
           detalle: "Confirma si el reporte esperado llegó a Entrada Karla.",
           destino: "control",
           tono: "amber",
@@ -1956,16 +1981,16 @@ export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }
           tone="violet"
         />
         <Metric
-          label="Procesos con problema"
-          value={problemas === null ? "—" : problemas}
-          hint={problemas === null ? "no se pudo leer el control" : problemas ? "revisar en Control del bot" : "todo en orden"}
-          tone={problemas ? "amber" : "green"}
+          label="Procesos con falla"
+          value={procesosConFalla === null ? "—" : procesosConFalla}
+          hint={procesosConFalla === null ? "no se pudo leer el control" : procesosConFalla ? "requieren revisión" : "12 procesos funcionando"}
+          tone={procesosConFalla ? "amber" : "green"}
         />
         <Metric
-          label="Fuentes desactualizadas"
-          value={desactualizadas === null ? "—" : desactualizadas}
-          hint={desactualizadas === null ? "no se pudo leer el control" : desactualizadas ? "un archivo lleva días sin llegar" : "todas al día"}
-          tone={desactualizadas ? "amber" : "green"}
+          label="Fuentes por revisar"
+          value={fuentesPorRevisar === null ? "—" : fuentesPorRevisar}
+          hint={fuentesPorRevisar === null ? "no se pudo leer el control" : fuentesPorRevisar ? "revisar Entrada Karla" : "todas al día"}
+          tone={fuentesPorRevisar ? "amber" : "green"}
         />
       </section>
 
