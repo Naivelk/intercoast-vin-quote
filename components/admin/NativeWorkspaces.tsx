@@ -689,7 +689,15 @@ async function callTool<T>(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action, args, force }),
   });
-  const data = await response.json();
+  const output = await response.text();
+  let data;
+  try {
+    data = JSON.parse(output);
+  } catch {
+    throw new Error(
+      "La sección no pudo terminar a tiempo. Intenta actualizarla en unos minutos.",
+    );
+  }
   if (!response.ok || !data.ok)
     throw new Error(data.error || "La herramienta no respondió.");
   return data.result as T;
@@ -4018,6 +4026,48 @@ function calendarKindClass(kind: Exclude<CalendarKind, "Todos">) {
   }[kind];
 }
 
+async function fetchCalendarDay(day: Date, force = false) {
+  const end = addDays(day, 1);
+  const response = await fetch(
+    `/api/admin/calendar?start=${encodeURIComponent(officeBoundary(day))}&end=${encodeURIComponent(officeBoundary(end))}${force ? "&force=1" : ""}`,
+    { credentials: "include" },
+  );
+  const output = await response.text();
+  let value: CalendarPayload;
+  try {
+    value = JSON.parse(output) as CalendarPayload;
+  } catch {
+    throw new Error("El calendario tardó demasiado en responder.");
+  }
+  if (!response.ok || !value.ok) {
+    throw new Error(
+      (value as CalendarPayload & { error?: string }).error ||
+        "No se pudo cargar el calendario.",
+    );
+  }
+  return value;
+}
+
+function mergeCalendarDays(parts: CalendarPayload[]): CalendarPayload {
+  const calendars = new Map<string, CalendarPayload["calendars"][number]>();
+  const events = new Map<string, CalendarEvent>();
+  let updatedAt = "";
+  parts.forEach((part) => {
+    part.calendars.forEach((item) => calendars.set(item.id, item));
+    part.events.forEach((event) => {
+      const key = `${event.calendarId}|${event.start}|${event.end}|${event.title}|${event.link}`;
+      events.set(key, event);
+    });
+    if (part.updatedAt > updatedAt) updatedAt = part.updatedAt;
+  });
+  return {
+    ok: true,
+    updatedAt,
+    calendars: Array.from(calendars.values()),
+    events: Array.from(events.values()),
+  };
+}
+
 export function NativeCalendar() {
   const [week, setWeek] = useState(() => startOfWeek(new Date()));
   const cacheKey = `calendar-${isoDay(week)}`;
@@ -4032,7 +4082,6 @@ export function NativeCalendar() {
     () => new Set([officeDay(new Date())]),
   );
   const [error, setError] = useState("");
-  const end = addDays(week, 7);
   const days = Array.from({ length: 7 }, (_, index) => addDays(week, index));
 
   const load = async (force = false) => {
@@ -4046,15 +4095,36 @@ export function NativeCalendar() {
     if (force || !cached) setLoading(true);
     setError("");
     try {
-      const response = await fetch(
-        `/api/admin/calendar?start=${encodeURIComponent(officeBoundary(week))}&end=${encodeURIComponent(officeBoundary(end))}${force ? "&force=1" : ""}`,
-        { credentials: "include" },
+      /* El puente llegaba al límite de Netlify al pedir 231 eventos de una
+       * sola vez. Siete lecturas pequeñas aíslan un día lento y evitan que una
+       * página de timeout borre la semana entera. */
+      const results = await Promise.allSettled(
+        days.map((day) => fetchCalendarDay(day, force)),
       );
-      const value = await response.json();
-      if (!response.ok || !value.ok)
-        throw new Error(value.error || "No se pudo cargar el calendario.");
+      const complete = results
+        .filter(
+          (result): result is PromiseFulfilledResult<CalendarPayload> =>
+            result.status === "fulfilled",
+        )
+        .map((result) => result.value);
+      if (!complete.length) {
+        throw new Error("El calendario no respondió. Intenta de nuevo en unos minutos.");
+      }
+      if (complete.length < days.length && cached) {
+        setData(cached);
+        setError(
+          `No se pudo actualizar ${days.length - complete.length} ${days.length - complete.length === 1 ? "día" : "días"}; se conserva la semana anterior.`,
+        );
+        return;
+      }
+      const value = mergeCalendarDays(complete);
       setData(value);
       writeCache(key, value);
+      if (complete.length < days.length) {
+        setError(
+          `Se cargaron ${complete.length} de ${days.length} días. Puedes volver a intentar los restantes.`,
+        );
+      }
     } catch (reason) {
       setError(
         reason instanceof Error
@@ -4398,19 +4468,6 @@ export async function precargarPanel() {
     ["console-summary", () => callTool("consola", "cargarResumen", [])],
     ["console-list", () => callTool("consola", "listaDelDia", [])],
     ["zelle", () => callTool("zelle", "datos", [])],
-    [
-      `calendar-${isoDay(startOfWeek(new Date()))}`,
-      async () => {
-        const semana = startOfWeek(new Date());
-        const fin = addDays(semana, 7);
-        const r = await fetch(
-          `/api/admin/calendar?start=${encodeURIComponent(officeBoundary(semana))}&end=${encodeURIComponent(officeBoundary(fin))}`,
-          { credentials: "include" },
-        );
-        const v = await r.json();
-        return r.ok && v.ok ? v : null;
-      },
-    ],
   ];
 
   for (const [clave, traer] of tareas) {
@@ -4457,16 +4514,6 @@ export function precargarVista(vista: string) {
     );
     return;
   }
-  if (vista === "calendario") {
-    const semana = startOfWeek(new Date());
-    void precargarUna(`calendar-${isoDay(semana)}`, async () => {
-      const fin = addDays(semana, 7);
-      const r = await fetch(
-        `/api/admin/calendar?start=${encodeURIComponent(officeBoundary(semana))}&end=${encodeURIComponent(officeBoundary(fin))}`,
-        { credentials: "include" },
-      );
-      const v = await r.json();
-      return r.ok && v.ok ? v : null;
-    });
-  }
+  /* Calendario se carga al abrirlo: ahora son siete lecturas pequeñas para no
+   * chocar con el timeout, y precargarlas consumiría cuota aunque nadie entre. */
 }

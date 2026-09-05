@@ -98,6 +98,8 @@ export default async (request) => {
   if (!url) return json(404, { error: "La herramienta no está configurada." });
 
   if (request.method === "POST") {
+    let action = "";
+    let fallback = null;
     try {
       const body = await request.json();
       const allowed = {
@@ -114,7 +116,7 @@ export default async (request) => {
         ]),
         zelle: new Set(["datos", "actualizar"]),
       };
-      const action = String(body.action || "");
+      action = String(body.action || "");
       if (!allowed[tool]?.has(action)) {
         return json(400, { error: "Acción no permitida." });
       }
@@ -123,6 +125,7 @@ export default async (request) => {
       const cacheKey = `${tool}:${action}:${JSON.stringify(args)}`;
       const ttl = CACHE_TTL[`${tool}:${action}`] || 0;
       const cached = memory.get(cacheKey);
+      if (cached) fallback = cached;
       if (!body.force && ttl && cached && Date.now() - cached.savedAt < ttl) {
         return json(200, { ...cached.data, cached: true });
       }
@@ -132,6 +135,7 @@ export default async (request) => {
        * molestar al bot, y se recalienta la memoria con lo que traiga. */
       if (!body.force && ttl) {
         const guardado = await leerDelAlmacen(cacheKey);
+        if (guardado) fallback = guardado;
         if (guardado && Date.now() - guardado.savedAt < ttl) {
           memory.set(cacheKey, guardado);
           return json(200, { ...guardado.data, cached: true });
@@ -158,8 +162,21 @@ export default async (request) => {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams(cuerpo),
+        /* El sitio corta las funciones largas alrededor de los 30 s. Salir un
+         * poco antes permite devolver JSON y, si existe, el último dato bueno
+         * en vez de la página HTML del timeout. */
+        signal: AbortSignal.timeout(26000),
       });
-      const data = await response.json();
+      const output = await response.text();
+      if (/^\s*</.test(output)) {
+        throw new Error("La fuente devolvió una página HTML.");
+      }
+      let data;
+      try {
+        data = JSON.parse(output);
+      } catch {
+        throw new Error("La fuente devolvió texto en vez de datos.");
+      }
       if (data.ok && ttl) {
         const savedAt = Date.now();
         memory.set(cacheKey, { data, savedAt });
@@ -171,9 +188,23 @@ export default async (request) => {
     } catch (error) {
       console.error("Admin tool call failed", {
         tool,
+        action,
         message: error instanceof Error ? error.message : "unknown",
       });
-      return json(502, { error: "La herramienta no respondió." });
+      if (fallback?.data) {
+        return json(200, {
+          ...fallback.data,
+          cached: true,
+          stale: true,
+          warning: "No se pudo actualizar; se conserva el último dato disponible.",
+        });
+      }
+      return json(502, {
+        error:
+          action === "inventarioCorreo"
+            ? "El correo tardó demasiado. Las demás secciones siguen disponibles."
+            : "Esta sección tardó demasiado. Intenta actualizarla en unos minutos.",
+      });
     }
   }
 

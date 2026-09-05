@@ -67,7 +67,9 @@ export default async (request) => {
         start: startDate.toISOString(),
         end: endDate.toISOString(),
       }),
-      signal: AbortSignal.timeout(55000),
+      /* El sitio corta esta función cerca de los 30 s. El cliente consulta un
+       * día por llamada; salir antes garantiza un error JSON recuperable. */
+      signal: AbortSignal.timeout(26000),
     });
     /* Apps Script puede conservar `text/plain` después de la redirección aun
      * cuando ContentService recibió MimeType.JSON. El contrato lo prueba el
