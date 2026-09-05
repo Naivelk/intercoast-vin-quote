@@ -11,6 +11,7 @@ import {
   NativeCalendar,
   NativeConsole,
   NativeZelle,
+  ManagerFiles,
   OfficeOperation,
   SystemControl,
   TodayHome,
@@ -787,6 +788,7 @@ export default function AdminPanel() {
     | "diagnosticos"
     | "auditoria"
     | "automatizaciones"
+    | "archivos"
   >(() => {
     const requested = new URLSearchParams(window.location.search).get("view");
     return requested === "control" ? "control" : "hoy";
@@ -1207,6 +1209,7 @@ export default function AdminPanel() {
         { id: "operacion", label: "Operación por oficina", icon: <FileSpreadsheet size={16} /> },
         { id: "consola", label: "Cartera y clientes", icon: <Search size={16} /> },
         { id: "zelle", label: "Zelle de agentes", icon: <WalletCards size={16} /> },
+        { id: "archivos", label: "Archivos de trabajo", icon: <FileSpreadsheet size={16} /> },
       ],
     },
     {
@@ -1236,6 +1239,7 @@ export default function AdminPanel() {
     leads: { titulo: "Leads", bajada: "Lo que entra por la web y por la radio" },
     consola: { titulo: "Cartera y clientes", bajada: "Buscador, pólizas y dinero del día" },
     zelle: { titulo: "Zelle de agentes", bajada: "Lo que entra por transferencia" },
+    archivos: { titulo: "Archivos de trabajo", bajada: "Libros, estado y accesos directos" },
     calendario: { titulo: "Calendario", bajada: "Los seis calendarios de la oficina" },
     control: { titulo: "Control del bot", bajada: "Procesos, activadores y órdenes manuales" },
     automatizaciones: { titulo: "Automatizaciones", bajada: "Lo que corre solo" },
@@ -1736,6 +1740,7 @@ export default function AdminPanel() {
               <OfficeOperation />
             </div>
           )}
+        {view === "archivos" && <ManagerFiles />}
         {view === "automatizaciones" && <AutomationCenter />}
         {view === "control" && (
             <div className="ic-vista">

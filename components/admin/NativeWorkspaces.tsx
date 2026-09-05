@@ -2713,6 +2713,113 @@ export function SystemControl() {
   );
 }
 
+const ARCHIVOS_MANAGER = [
+  {
+    nombre: "CUENTAS OFICINAS ALEQUIM",
+    detalle: "Cuadre diario por agente y oficina",
+    url: "https://drive.google.com/file/d/1J6Cd9WNFZDElVxGYliygygGv8FllGjBE/view",
+    componente: "cuadre",
+  },
+  {
+    nombre: "Nómina operativa",
+    detalle: "Pago semanal, comisiones y ajustes",
+    url: "https://drive.google.com/file/d/1csuNnHVO-1lMsNU8-Vm0EL6CeswqoduE/view",
+    componente: "nomina",
+  },
+  {
+    nombre: "Renovaciones South Gate",
+    detalle: "Libro de renovaciones del manager",
+    url: "https://docs.google.com/spreadsheets/d/13U3dEE7qarQTWMd8rklb6p1oj-gazvXi/edit",
+    fuente: "POLIZAS_RENOVACIONES",
+  },
+  {
+    nombre: "Comisiones de Karla",
+    detalle: "Libro operativo de comisiones",
+    url: "https://drive.google.com/file/d/1Dmq5AEUc3LLcoo6U0oTW_BjRDAPnPn9Z/view",
+    componente: "comisiones",
+  },
+] as const;
+
+/** Accesos directos del manager. Los enlaces no contienen credenciales. */
+export function ManagerFiles() {
+  const [data, setData] = useState<ControlData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const value = await callTool<ControlData>("consola", "centroControl", [], true);
+      setData(value);
+      setError("");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "No se pudo leer el estado.");
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => { void load(); }, []);
+
+  const estadoDe = (archivo: (typeof ARCHIVOS_MANAGER)[number]) => {
+    if ("componente" in archivo) {
+      const c = data?.componentes?.find((x) => x.id === archivo.componente);
+      return { estado: c?.estado || "SIN MEDIR", momento: c?.fin || c?.inicio || "" };
+    }
+    const f = data?.fuentes?.find((x) => x.id === archivo.fuente);
+    return { estado: f?.estado || "SIN MEDIR", momento: f?.ultima || "" };
+  };
+
+  return (
+    <section className="space-y-5">
+      <div className="ic-panel overflow-hidden rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm md:p-7">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[.16em] text-blue-700">Archivos de trabajo</p>
+            <h2 className="mt-2 text-2xl font-black text-slate-950">Libros del manager</h2>
+            <p className="mt-1 max-w-2xl text-sm text-slate-500">
+              Abre el archivo correcto y comprueba cuándo terminó su proceso. Google Drive conserva el control de acceso.
+            </p>
+          </div>
+          <button onClick={() => void load()} disabled={loading}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 disabled:opacity-60">
+            <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> Actualizar estado
+          </button>
+        </div>
+        {error ? <p className="mt-4 rounded-xl bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p> : null}
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          {ARCHIVOS_MANAGER.map((archivo) => {
+            const estado = estadoDe(archivo);
+            const bien = estado.estado === "OK" || estado.estado === "OMITIDA";
+            return (
+              <a key={archivo.nombre} href={archivo.url} target="_blank" rel="noreferrer"
+                className="group rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:-translate-y-0.5 hover:border-blue-300 hover:bg-white hover:shadow-md">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="grid h-10 w-10 place-items-center rounded-xl bg-blue-100 text-blue-700"><FileSpreadsheet size={20} /></span>
+                  <ExternalLink size={17} className="text-slate-400 group-hover:text-blue-700" />
+                </div>
+                <h3 className="mt-4 font-black text-slate-950">{archivo.nombre}</h3>
+                <p className="mt-1 text-xs text-slate-500">{archivo.detalle}</p>
+                <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
+                  <span className={`rounded-full px-2.5 py-1 font-black ${bien ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-800"}`}>
+                    {bien ? "AL DÍA" : estado.estado.replaceAll("_", " ")}
+                  </span>
+                  {estado.momento ? <span className="text-slate-500">Revisado {estado.momento}</span> : null}
+                </div>
+              </a>
+            );
+          })}
+        </div>
+        <a href="https://drive.google.com/drive/folders/1velct65gOyO4qo2EnYh5o6IdwehZUuxz"
+          target="_blank" rel="noreferrer"
+          className="mt-5 inline-flex items-center gap-2 rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-black text-white">
+          <FolderOpen size={17} /> Ver todos los archivos y respaldos
+          <ExternalLink size={15} />
+        </a>
+      </div>
+    </section>
+  );
+}
+
 export function NativeConsole() {
   const [summary, setSummary] = useState<ConsoleSummary | null>(() =>
     readCache("console-summary"),
