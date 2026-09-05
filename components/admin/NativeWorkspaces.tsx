@@ -444,6 +444,26 @@ const moneyExact = (value: number | null | undefined) =>
     maximumFractionDigits: 2,
   }).format(Number(value || 0));
 
+/**
+ * Las fuentes entregan `YYYY-MM-DD`. Convertirlo a medianoche UTC puede mover
+ * el día al mostrarlo en California; el mediodía conserva la fecha civil.
+ */
+function fechaHumana(
+  value: string,
+  style: "corta" | "larga" = "corta",
+) {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return value || "—";
+  const date = new Date(`${value}T12:00:00Z`);
+  return new Intl.DateTimeFormat("es-US", {
+    weekday: style === "larga" ? "long" : "short",
+    day: "numeric",
+    month: style === "larga" ? "long" : "short",
+    ...(style === "larga" ? { year: "numeric" as const } : {}),
+    timeZone: "UTC",
+  }).format(date);
+}
+
 /* ═══ EL CACHÉ DEL PANEL ═══
  *
  * Estaba en `sessionStorage`, que **se borra al cerrar la pestaña**: cada vez
@@ -649,6 +669,20 @@ function writeCache<T>(key: string, data: T) {
       `intercoast:${key}`,
       JSON.stringify({ savedAt: Date.now(), data }),
     );
+  } catch {}
+}
+
+function readPreference(key: string, fallback = "Todos") {
+  try {
+    return localStorage.getItem(`intercoast:preferencia:${key}`) || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writePreference(key: string, value: string) {
+  try {
+    localStorage.setItem(`intercoast:preferencia:${key}`, value);
   } catch {}
 }
 
@@ -3635,8 +3669,12 @@ export function NativeConsole() {
 export function NativeZelle() {
   const [data, setData] = useState<ZelleData | null>(() => readCache("zelle"));
   const [query, setQuery] = useState("");
-  const [agentFilter, setAgentFilter] = useState("Todos");
-  const [dayFilter, setDayFilter] = useState("Todos");
+  const [agentFilter, setAgentFilter] = useState(() =>
+    readPreference("zelle-agente"),
+  );
+  const [dayFilter, setDayFilter] = useState(() =>
+    readPreference("zelle-dia"),
+  );
   const [loading, setLoading] = useState(!data);
   const [error, setError] = useState("");
   const started = useRef(false);
@@ -3670,10 +3708,17 @@ export function NativeZelle() {
     started.current = true;
     void load(false);
   }, []);
+  useEffect(() => writePreference("zelle-agente", agentFilter), [agentFilter]);
+  useEffect(() => writePreference("zelle-dia", dayFilter), [dayFilter]);
   const allPayments = data?.pagos || [];
   const days = Array.from(new Set(allPayments.map((item) => item.fecha))).sort(
     (a, b) => b.localeCompare(a),
   );
+  useEffect(() => {
+    if (dayFilter !== "Todos" && data && !days.includes(dayFilter)) {
+      setDayFilter("Todos");
+    }
+  }, [data, dayFilter, days]);
   const matchesSearchAndDay = allPayments.filter(
     (item) =>
       (dayFilter === "Todos" || item.fecha === dayFilter) &&
@@ -3850,7 +3895,7 @@ export function NativeZelle() {
                 aria-pressed={dayFilter === day}
                 className={`rounded-xl px-3.5 py-2 text-xs font-black transition ${dayFilter === day ? "bg-violet-700 text-white" : "border border-violet-100 bg-white text-violet-700 hover:border-violet-300"}`}
               >
-                {day}
+                {fechaHumana(day)}
               </button>
             ))}
           </div>
@@ -3871,7 +3916,9 @@ export function NativeZelle() {
           {Object.entries(groups).map(([day, items]) => (
             <section key={day}>
               <div className="mb-2 flex items-center justify-between">
-                <h4 className="text-sm font-black text-violet-950">{day}</h4>
+                <h4 className="text-sm font-black capitalize text-violet-950">
+                  {fechaHumana(day, "larga")}
+                </h4>
                 <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-bold text-violet-700">
                   {items.length} pagos
                 </span>
@@ -4076,8 +4123,13 @@ export function NativeCalendar() {
   );
   const [loading, setLoading] = useState(!data);
   const [query, setQuery] = useState("");
-  const [calendar, setCalendar] = useState("Todos");
-  const [kind, setKind] = useState<CalendarKind>("Todos");
+  const [calendar, setCalendar] = useState(() =>
+    readPreference("calendario-agente"),
+  );
+  const [kind, setKind] = useState<CalendarKind>(() => {
+    const saved = readPreference("calendario-tipo") as CalendarKind;
+    return CALENDAR_KINDS.includes(saved) ? saved : "Todos";
+  });
   const [expandedDays, setExpandedDays] = useState<Set<string>>(
     () => new Set([officeDay(new Date())]),
   );
@@ -4138,6 +4190,22 @@ export function NativeCalendar() {
   useEffect(() => {
     void load(false);
   }, [week.getTime()]);
+
+  useEffect(
+    () => writePreference("calendario-agente", calendar),
+    [calendar],
+  );
+  useEffect(() => writePreference("calendario-tipo", kind), [kind]);
+
+  useEffect(() => {
+    if (
+      calendar !== "Todos" &&
+      data?.calendars &&
+      !data.calendars.some((item) => item.name === calendar)
+    ) {
+      setCalendar("Todos");
+    }
+  }, [calendar, data]);
 
   useEffect(() => {
     const keys = days.map(isoDay);
