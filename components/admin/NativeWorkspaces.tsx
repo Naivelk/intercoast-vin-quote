@@ -346,6 +346,26 @@ type ControlData = {
   mensaje?: string;
 };
 
+type DriveHealthData = {
+  ok: boolean;
+  updatedAt: string;
+  revisados: number;
+  conHuella: number;
+  incompleto: boolean;
+  archivosDuplicados: number;
+  bytesDesperdiciados: number;
+  grupos: Array<{
+    grupo: number;
+    copias: number;
+    bytes: number;
+    desperdiciados: number;
+    ultima: string;
+  }>;
+  cached?: boolean;
+  stale?: boolean;
+  error?: string;
+};
+
 const INPUT_GUIDES: Record<
   string,
   {
@@ -1963,6 +1983,47 @@ type PendingItem = {
   fecha?: string;
 };
 
+type PendingFollowUp = {
+  revisado: boolean;
+  nota: string;
+  actualizado: string;
+};
+
+type PendingFollowUps = Record<string, PendingFollowUp>;
+
+const PENDING_FOLLOW_UP_KEY = "intercoast-pending-follow-up-v1";
+
+function leerSeguimientosPendientes(): PendingFollowUps {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PENDING_FOLLOW_UP_KEY) || "{}");
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function guardarSeguimientosPendientes(value: PendingFollowUps) {
+  localStorage.setItem(PENDING_FOLLOW_UP_KEY, JSON.stringify(value));
+}
+
+function huellaPendiente(item: PendingItem) {
+  return `${item.id}|${String(item.fecha || "").slice(0, 10)}|${item.detalle}`;
+}
+
+function fechasHastaHoy(desde: string, hasta: string) {
+  const limite = new Date().toISOString().slice(0, 10);
+  const fin = hasta < limite ? hasta : limite;
+  const fechas: string[] = [];
+  for (
+    let cursor = Date.parse(`${desde}T12:00:00Z`);
+    cursor <= Date.parse(`${fin}T12:00:00Z`);
+    cursor += 86400000
+  ) {
+    fechas.push(new Date(cursor).toISOString().slice(0, 10));
+  }
+  return fechas;
+}
+
 /**
  * Una sola clasificación para Inicio y para el Centro de pendientes.
  *
@@ -2459,9 +2520,14 @@ export function PendingCenter({
   const [control, setControl] = useState<ControlData | null>(null);
   const [operacion, setOperacion] = useState<OfficeOperationData | null>(null);
   const [zelle, setZelle] = useState<ZelleData | null>(() => readCache("zelle"));
+  const [driveHealth, setDriveHealth] = useState<DriveHealthData | null>(null);
   const [loading, setLoading] = useState(true);
   const [consultasFallidas, setConsultasFallidas] = useState<string[]>([]);
   const [filtro, setFiltro] = useState<"todos" | PendingCategory>("todos");
+  const [seguimientos, setSeguimientos] = useState<PendingFollowUps>(() =>
+    leerSeguimientosPendientes(),
+  );
+  const [notaAbierta, setNotaAbierta] = useState("");
 
   const load = async (force = false) => {
     setLoading(true);
@@ -2474,9 +2540,14 @@ export function PendingCenter({
         force,
       ),
       callTool<ZelleData>("zelle", "datos", [], force),
+      fetch(`/api/admin/drive-health${force ? "?force=1" : ""}`, {
+        credentials: "include",
+      }).then((response) =>
+        leerJsonSeguro<DriveHealthData>(response, "No se pudo medir Drive."),
+      ),
     ]);
     const fallidas: string[] = [];
-    const [ctl, ope, zel] = resultados;
+    const [ctl, ope, zel, drive] = resultados;
     if (ctl.status === "fulfilled" && ctl.value?.ok) setControl(ctl.value);
     else {
       setControl(null);
@@ -2495,6 +2566,11 @@ export function PendingCenter({
     } else {
       if (!zelle) setZelle(null);
       fallidas.push("Zelle");
+    }
+    if (drive.status === "fulfilled" && drive.value?.ok) setDriveHealth(drive.value);
+    else {
+      setDriveHealth(null);
+      fallidas.push("Duplicados de Drive");
     }
     setConsultasFallidas(fallidas);
     setLoading(false);
@@ -2515,6 +2591,65 @@ export function PendingCenter({
     filtro === "todos"
       ? resumen.items
       : resumen.items.filter((item) => item.categoria === filtro);
+  const diasDelMes = fechasHastaHoy(rango.desde, rango.hasta);
+  const diasMedidos = new Set(operacion?.diasConDato || []);
+  const diasParciales = new Set(operacion?.parciales || []);
+  const zelleSinAsignarPorDia = (zelle?.pagos || []).reduce<Record<string, number>>(
+    (porDia, pago) => {
+      const sinDueno =
+        !String(pago.agente || "").trim() ||
+        String(pago.agente).trim().toUpperCase() === "SIN ASIGNAR";
+      if (sinDueno && pago.fecha)
+        porDia[pago.fecha] = (porDia[pago.fecha] || 0) + 1;
+      return porDia;
+    },
+    {},
+  );
+  const cierres = diasDelMes.map((fecha) => {
+    const medido = diasMedidos.has(fecha);
+    const parcial = diasParciales.has(fecha);
+    const zellePendiente = zelleSinAsignarPorDia[fecha] || 0;
+    const estado = !medido
+      ? "FALTA INFORMACIÓN"
+      : parcial || zellePendiente
+        ? "REVISAR"
+        : "CERRADO";
+    return { fecha, medido, parcial, zellePendiente, estado };
+  });
+  const cerrados = cierres.filter((dia) => dia.estado === "CERRADO").length;
+  const aRevisar = cierres.filter((dia) => dia.estado === "REVISAR").length;
+  const sinMedir = cierres.filter((dia) => dia.estado === "FALTA INFORMACIÓN").length;
+  const actividadContable = (control?.actividad || [])
+    .filter((entry) =>
+      ["cuadre", "deposito", "tarjetas", "operacion", "recibos_chase"].includes(
+        entry.componente,
+      ),
+    )
+    .slice(0, 8);
+  const tarjetas = control?.componentes?.find((item) => item.id === "tarjetas");
+  const fuentesPreventivas = (control?.fuentes || []).filter(
+    (source) =>
+      source.estado === "OK" &&
+      typeof source.dias === "number" &&
+      source.maxDias - source.dias <= 2,
+  );
+
+  const actualizarSeguimiento = (
+    item: PendingItem,
+    patch: Partial<PendingFollowUp>,
+  ) => {
+    const key = huellaPendiente(item);
+    const next = {
+      ...seguimientos,
+      [key]: {
+        ...(seguimientos[key] || { revisado: false, nota: "", actualizado: "" }),
+        ...patch,
+        actualizado: new Date().toISOString(),
+      },
+    };
+    setSeguimientos(next);
+    guardarSeguimientosPendientes(next);
+  };
   const filtros: Array<{
     id: "todos" | PendingCategory;
     label: string;
@@ -2631,6 +2766,48 @@ export function PendingCenter({
                       <span>Referencia: {fechaHumana(String(item.fecha).slice(0, 10))}</span>
                     )}
                   </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        actualizarSeguimiento(item, {
+                          revisado: !seguimientos[huellaPendiente(item)]?.revisado,
+                        })
+                      }
+                      className={`rounded-lg px-3 py-1.5 text-[11px] font-black ${
+                        seguimientos[huellaPendiente(item)]?.revisado
+                          ? "bg-emerald-100 text-emerald-800"
+                          : "bg-slate-100 text-slate-700"
+                      }`}
+                    >
+                      {seguimientos[huellaPendiente(item)]?.revisado
+                        ? "Revisado ✓"
+                        : "Marcar revisado"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setNotaAbierta((actual) =>
+                          actual === huellaPendiente(item) ? "" : huellaPendiente(item),
+                        )
+                      }
+                      className="rounded-lg bg-blue-50 px-3 py-1.5 text-[11px] font-black text-blue-700"
+                    >
+                      {seguimientos[huellaPendiente(item)]?.nota ? "Editar nota" : "Añadir nota"}
+                    </button>
+                  </div>
+                  {notaAbierta === huellaPendiente(item) && (
+                    <textarea
+                      value={seguimientos[huellaPendiente(item)]?.nota || ""}
+                      onChange={(event) =>
+                        actualizarSeguimiento(item, { nota: event.target.value })
+                      }
+                      rows={2}
+                      maxLength={300}
+                      placeholder="Nota de seguimiento en este navegador…"
+                      className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 outline-none focus:border-blue-400"
+                    />
+                  )}
                 </div>
                 <button
                   type="button"
@@ -2656,6 +2833,133 @@ export function PendingCenter({
             </div>
           </div>
         )}
+      </section>
+
+      <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+        <div className="border-b border-slate-100 px-5 py-4">
+          <p className="text-[10px] font-black uppercase tracking-[.12em] text-blue-700">
+            Cierre diario inteligente
+          </p>
+          <h3 className="mt-1 text-lg font-black text-slate-950">
+            Estado del mes hasta hoy
+          </h3>
+          <p className="mt-1 text-xs text-slate-500">
+            Usa los días publicados por Operación y los Zelle sin dueño. Un día
+            ausente nunca se presenta como cero.
+          </p>
+        </div>
+        <div className="grid gap-3 p-5 sm:grid-cols-3">
+          <Metric label="Cerrados" value={loading ? "—" : cerrados} hint="medidos, completos y sin Zelle pendiente" tone="green" />
+          <Metric label="Por revisar" value={loading ? "—" : aRevisar} hint="parciales o con Zelle sin dueño" tone="amber" />
+          <Metric label="Sin medir" value={loading ? "—" : sinMedir} hint="falta evidencia; no significa cero" tone="violet" />
+        </div>
+        {!loading && (
+          <div className="grid grid-cols-4 gap-2 border-t border-slate-100 p-5 sm:grid-cols-7 lg:grid-cols-10">
+            {cierres.map((dia) => {
+              const estilo =
+                dia.estado === "CERRADO"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                  : dia.estado === "REVISAR"
+                    ? "border-amber-200 bg-amber-50 text-amber-800"
+                    : "border-blue-200 bg-blue-50 text-blue-800";
+              return (
+                <div key={dia.fecha} className={`rounded-xl border p-2 text-center ${estilo}`} title={`${dia.fecha} · ${dia.estado}`}>
+                  <p className="text-[10px] font-black uppercase">{dia.fecha.slice(8)}</p>
+                  <p className="mt-1 text-[9px] font-black leading-tight">
+                    {dia.estado === "CERRADO" ? "Cerrado" : dia.estado === "REVISAR" ? "Revisar" : "Sin medir"}
+                  </p>
+                  {dia.zellePendiente > 0 && <p className="mt-1 text-[9px]">{dia.zellePendiente} Zelle</p>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className="grid gap-5 xl:grid-cols-2">
+        <article className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+          <p className="text-[10px] font-black uppercase tracking-[.12em] text-blue-700">Historial de correcciones</p>
+          <h3 className="mt-1 text-lg font-black text-slate-950">Últimas revisiones contables</h3>
+          <p className="mt-1 text-xs text-slate-500">Distingue ejecuciones automáticas y órdenes manuales sin mostrar filas sensibles.</p>
+          <div className="mt-4 divide-y divide-slate-100">
+            {actividadContable.length ? actividadContable.map((entry) => (
+              <div key={entry.id} className="py-3 first:pt-0 last:pb-0">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm font-black text-slate-900">{entry.nombre}</p>
+                  <span className="rounded-full bg-slate-100 px-2 py-1 text-[9px] font-black uppercase text-slate-600">{entry.origen || "Sin origen"}</span>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">{entry.fin || entry.inicio} · {entry.estado}</p>
+                {entry.detalle && <p className="mt-1 text-xs text-slate-600">{entry.detalle}</p>}
+              </div>
+            )) : <p className="rounded-xl bg-slate-50 p-4 text-xs text-slate-500">Todavía no hay revisiones contables publicadas.</p>}
+          </div>
+        </article>
+
+        <article className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+          <p className="text-[10px] font-black uppercase tracking-[.12em] text-blue-700">Informe semanal</p>
+          <h3 className="mt-1 text-lg font-black text-slate-950">Tarjetas y salud de fuentes</h3>
+          <div className={`mt-4 rounded-2xl border p-4 ${tarjetas?.estado === "OK" ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-black text-slate-950">Auditoría de tarjetas</p>
+                <p className="mt-1 text-xs text-slate-600">Corre cada lunes y envía el resumen por Telegram.</p>
+              </div>
+              <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-slate-700">{tarjetas?.estado || "SIN MEDIR"}</span>
+            </div>
+            <p className="mt-3 text-sm text-slate-700">{tarjetas?.detalle || "Esperando la primera medición disponible."}</p>
+            {(tarjetas?.fin || tarjetas?.inicio) && <p className="mt-2 text-xs font-semibold text-slate-500">Último informe: {tarjetas.fin || tarjetas.inicio}</p>}
+          </div>
+          <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="font-black text-slate-900">Alertas antes del atraso</p>
+            {fuentesPreventivas.length ? (
+              <ul className="mt-2 space-y-2 text-xs text-slate-600">
+                {fuentesPreventivas.map((source) => (
+                  <li key={source.id}>• {source.nombre}: vence en {Math.max(0, Math.ceil(source.maxDias - (source.dias || 0)))} día(s).</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-xs text-slate-600">Ninguna fuente sana está a dos días o menos de vencer.</p>
+            )}
+          </div>
+          <div className="mt-3 rounded-2xl border border-dashed border-slate-300 p-4">
+            <p className="font-black text-slate-900">Duplicados de Drive</p>
+            {driveHealth ? (
+              <>
+                <p className="mt-1 text-sm font-black text-slate-800">
+                  {driveHealth.archivosDuplicados
+                    ? `${driveHealth.archivosDuplicados} archivos forman ${driveHealth.grupos.length} grupo(s) idéntico(s)`
+                    : "No se encontraron copias idénticas entre los archivos con huella"}
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                  {driveHealth.revisados} revisados · {driveHealth.conHuella} comparables
+                  {driveHealth.bytesDesperdiciados
+                    ? ` · ${(driveHealth.bytesDesperdiciados / 1048576).toFixed(1)} MB repetidos`
+                    : ""}
+                  {driveHealth.incompleto ? " · se alcanzó el tope de 500" : ""}.
+                  Solo compara MD5 y tamaño; no revela nombres y no borra nada.
+                </p>
+                {driveHealth.grupos.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {driveHealth.grupos.slice(0, 6).map((grupo) => (
+                      <span key={grupo.grupo} className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-black text-amber-800">
+                        Grupo {grupo.grupo}: {grupo.copias} copias
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                La medición no está disponible. No se interpreta esa ausencia como “sin duplicados”.
+              </p>
+            )}
+            {control?.carpetaReportesUrl && (
+              <a href={control.carpetaReportesUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white">
+                <FolderOpen size={15} /> Revisar carpeta <ExternalLink size={13} />
+              </a>
+            )}
+          </div>
+        </article>
       </section>
     </div>
   );
