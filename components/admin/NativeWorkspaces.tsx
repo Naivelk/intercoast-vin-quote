@@ -2521,6 +2521,7 @@ export function PendingCenter({
   const [operacion, setOperacion] = useState<OfficeOperationData | null>(null);
   const [zelle, setZelle] = useState<ZelleData | null>(() => readCache("zelle"));
   const [driveHealth, setDriveHealth] = useState<DriveHealthData | null>(null);
+  const [driveLoading, setDriveLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [consultasFallidas, setConsultasFallidas] = useState<string[]>([]);
   const [filtro, setFiltro] = useState<"todos" | PendingCategory>("todos");
@@ -2529,8 +2530,36 @@ export function PendingCenter({
   );
   const [notaAbierta, setNotaAbierta] = useState("");
 
+  const loadDriveHealth = async (force = false) => {
+    setDriveLoading(true);
+    try {
+      const response = await fetch(
+        `/api/admin/drive-health${force ? "?force=1" : ""}`,
+        { credentials: "include" },
+      );
+      const value = await leerJsonSeguro<DriveHealthData>(
+        response,
+        "No se pudo medir Drive.",
+      );
+      setDriveHealth(value);
+      setConsultasFallidas((actuales) =>
+        actuales.filter((nombre) => nombre !== "Duplicados de Drive"),
+      );
+    } catch {
+      setDriveHealth(null);
+      setConsultasFallidas((actuales) =>
+        actuales.includes("Duplicados de Drive")
+          ? actuales
+          : [...actuales, "Duplicados de Drive"],
+      );
+    } finally {
+      setDriveLoading(false);
+    }
+  };
+
   const load = async (force = false) => {
     setLoading(true);
+    void loadDriveHealth(force);
     const resultados = await Promise.allSettled([
       callTool<ControlData>("consola", "centroControl", [], force),
       callTool<OfficeOperationData>(
@@ -2540,14 +2569,9 @@ export function PendingCenter({
         force,
       ),
       callTool<ZelleData>("zelle", "datos", [], force),
-      fetch(`/api/admin/drive-health${force ? "?force=1" : ""}`, {
-        credentials: "include",
-      }).then((response) =>
-        leerJsonSeguro<DriveHealthData>(response, "No se pudo medir Drive."),
-      ),
     ]);
     const fallidas: string[] = [];
-    const [ctl, ope, zel, drive] = resultados;
+    const [ctl, ope, zel] = resultados;
     if (ctl.status === "fulfilled" && ctl.value?.ok) setControl(ctl.value);
     else {
       setControl(null);
@@ -2567,12 +2591,10 @@ export function PendingCenter({
       if (!zelle) setZelle(null);
       fallidas.push("Zelle");
     }
-    if (drive.status === "fulfilled" && drive.value?.ok) setDriveHealth(drive.value);
-    else {
-      setDriveHealth(null);
-      fallidas.push("Duplicados de Drive");
-    }
-    setConsultasFallidas(fallidas);
+    setConsultasFallidas((actuales) => [
+      ...fallidas,
+      ...actuales.filter((nombre) => nombre === "Duplicados de Drive"),
+    ]);
     setLoading(false);
   };
 
@@ -2948,6 +2970,8 @@ export function PendingCenter({
                   </div>
                 )}
               </>
+            ) : driveLoading ? (
+              <p className="mt-1 text-xs leading-relaxed text-slate-600">Comparando huellas en segundo plano…</p>
             ) : (
               <p className="mt-1 text-xs leading-relaxed text-slate-600">
                 La medición no está disponible. No se interpreta esa ausencia como “sin duplicados”.
