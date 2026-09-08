@@ -1789,6 +1789,7 @@ export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }
   const [operacion, setOperacion] = useState<OfficeOperationData | null>(null);
   const [asistencia, setAsistencia] = useState<AttendanceData | null>(null);
   const [control, setControl] = useState<ControlData | null>(null);
+  const [zelle, setZelle] = useState<ZelleData | null>(() => readCache("zelle"));
   const [loading, setLoading] = useState(true);
 
   const rango = useMemo(() => mesEnCurso(new Date()), []);
@@ -1815,6 +1816,18 @@ export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }
     void load();
   }, [rango.desde, rango.hasta]);
 
+  /* Zelle completa la bandeja, pero no participa en el bloqueo de carga del
+   * inicio. Si su proyecto tarda o no responde, las demás prioridades siguen
+   * apareciendo y se conserva el último resumen bueno del navegador. */
+  useEffect(() => {
+    void callTool<ZelleData>("zelle", "datos", [])
+      .then((value) => {
+        setZelle(value);
+        writeCache("zelle", value);
+      })
+      .catch(() => undefined);
+  }, []);
+
   const oficinas = operacion?.oficinas || [];
   const faltan = operacion?.diasSinDato || [];
   const medidos = operacion?.diasConDato?.length || 0;
@@ -1834,11 +1847,21 @@ export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }
         ["AVISO", "CRITICO"].includes(component.capacidad?.estado || ""),
       ).length
     : null;
-  const fuentesPorRevisar = control?.ok
+  const fuentesPendientes = control?.ok
     ? (control.fuentes || []).filter((source) =>
         ["DESACTUALIZADO", "SIN_DISTINGUIR"].includes(source.estado),
-      ).length
+      )
     : null;
+  const fuentesPorRevisar = fuentesPendientes?.length ?? null;
+  const zellesSinAsignar = (zelle?.pagos || []).filter(
+    (payment) =>
+      !String(payment.agente || "").trim() ||
+      String(payment.agente).trim().toUpperCase() === "SIN ASIGNAR",
+  );
+  const montoZelleSinAsignar = zellesSinAsignar.reduce(
+    (sum, payment) => sum + Number(payment.monto || 0),
+    0,
+  );
   const atenciones = [
     procesosConFalla
       ? {
@@ -1861,13 +1884,26 @@ export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }
           tono: "amber",
         }
       : null,
-    fuentesPorRevisar
+    ...(fuentesPendientes || []).map((source) => {
+      const guide = INPUT_GUIDES[source.id];
+      return {
+        id: `fuente-${source.id}`,
+        nivel: "Archivo",
+        titulo: `${source.nombre || guide?.title || source.id} necesita revisión`,
+        detalle: source.ultima
+          ? `Último archivo: ${source.ultima}. Responsable: ${guide?.owner || "oficina"}.`
+          : `Aún no tiene una medición confiable. Responsable: ${guide?.owner || "oficina"}.`,
+        destino: "archivos",
+        tono: "amber" as const,
+      };
+    }),
+    zellesSinAsignar.length
       ? {
-          id: "fuentes",
-          nivel: "Revisar",
-          titulo: `${fuentesPorRevisar} ${fuentesPorRevisar === 1 ? "fuente necesita" : "fuentes necesitan"} revisión`,
-          detalle: "Confirma si el reporte esperado llegó a Entrada Karla.",
-          destino: "control",
+          id: "zelle-sin-asignar",
+          nivel: "Asignar",
+          titulo: `${zellesSinAsignar.length} ${zellesSinAsignar.length === 1 ? "Zelle no tiene" : "Zelle no tienen"} dueño`,
+          detalle: `${moneyExact(montoZelleSinAsignar)} en el periodo publicado. Abre el detalle para identificar cada pago.`,
+          destino: "zelle",
           tono: "amber",
         }
       : null,
