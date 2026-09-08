@@ -14,6 +14,7 @@ import {
   NativeZelle,
   ManagerFiles,
   OfficeOperation,
+  PendingCenter,
   SystemControl,
   TodayHome,
   precargarPanel,
@@ -34,6 +35,7 @@ import {
 } from "./admin/http";
 import {
   Activity,
+  AlertTriangle,
   Bot,
   BriefcaseBusiness,
   CalendarDays,
@@ -783,6 +785,7 @@ export default function AdminPanel() {
   const [message, setMessage] = useState("");
   const [view, setView] = useState<
     | "hoy"
+    | "pendientes"
     | "operacion"
     | "trabajo"
     | "resumen"
@@ -1237,6 +1240,7 @@ export default function AdminPanel() {
       grupo: "El día",
       cuando: "cada mañana",
       items: [
+        { id: "pendientes", label: "Pendientes", icon: <AlertTriangle size={16} /> },
         { id: "trabajo", label: "Casos de hoy", icon: <BriefcaseBusiness size={16} /> },
         { id: "calendario", label: "Calendario", icon: <CalendarDays size={16} /> },
         { id: "leads", label: "Leads", icon: <Sparkles size={16} />, badge: unassigned },
@@ -1271,6 +1275,7 @@ export default function AdminPanel() {
   };
   const TITULOS: Record<string, { titulo: string; bajada: string }> = {
     hoy: { titulo: "Hoy", bajada: "Lo que entró, lo que falta y quién está trabajando" },
+    pendientes: { titulo: "Pendientes", bajada: "Qué falta, quién lo revisa y dónde resolverlo" },
     operacion: {
       titulo: "Operación por oficina",
       bajada: "Lo que entró por oficina según Sentry, por día, semana o mes",
@@ -1801,6 +1806,9 @@ export default function AdminPanel() {
         )}
         {view === "hoy" && (
           <TodayHome onNavigate={(target) => setView(target as typeof view)} />
+        )}
+        {view === "pendientes" && (
+          <PendingCenter onNavigate={(target) => setView(target as typeof view)} />
         )}
         {view === "operacion" && (
             <div className="ic-vista">

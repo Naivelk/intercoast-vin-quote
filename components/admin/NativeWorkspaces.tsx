@@ -1950,6 +1950,165 @@ function TotalOficinas({
   return <>{moneyExact(total)}</>;
 }
 
+type PendingCategory = "informacion" | "revision" | "falla" | "vigilar";
+type PendingItem = {
+  id: string;
+  categoria: PendingCategory;
+  nivel: string;
+  titulo: string;
+  detalle: string;
+  destino: string;
+  tono: "rose" | "amber" | "blue";
+  responsable: string;
+  fecha?: string;
+};
+
+/**
+ * Una sola clasificación para Inicio y para el Centro de pendientes.
+ *
+ * No calcula cifras de negocio: ordena estados que ya entregan Control,
+ * Operación y Zelle. Mantenerlo puro evita que dos pantallas terminen contando
+ * de forma distinta la misma alerta.
+ */
+function construirPendientes(
+  control: ControlData | null,
+  zelle: ZelleData | null,
+  operacion: OfficeOperationData | null,
+) {
+  const componentesConFalla = control?.ok
+    ? (control.componentes || []).filter((component) =>
+        ["ERROR", "CONGELADO", "ATRASADO"].includes(component.estado),
+      )
+    : null;
+  const componentesConAviso = control?.ok
+    ? (control.componentes || []).filter(
+        (component) => component.estado === "AVISO",
+      )
+    : null;
+  const procesosConFalla = componentesConFalla
+    ? componentesConFalla.length + (control?.ordenes?.errores || 0)
+    : null;
+  const componentesDeCapacidad = control?.ok
+    ? (control.componentes || []).filter((component) =>
+        ["AVISO", "CRITICO"].includes(component.capacidad?.estado || ""),
+      )
+    : null;
+  const fuentesPendientes = control?.ok
+    ? (control.fuentes || []).filter((source) =>
+        ["DESACTUALIZADO", "SIN_DISTINGUIR"].includes(source.estado),
+      )
+    : null;
+  const zellesSinAsignar = (zelle?.pagos || []).filter(
+    (payment) =>
+      !String(payment.agente || "").trim() ||
+      String(payment.agente).trim().toUpperCase() === "SIN ASIGNAR",
+  );
+  const montoZelleSinAsignar = zellesSinAsignar.reduce(
+    (sum, payment) => sum + Number(payment.monto || 0),
+    0,
+  );
+  const faltan = operacion?.diasSinDato || [];
+  const medidos = operacion?.diasConDato?.length || 0;
+
+  const items = [
+    procesosConFalla
+      ? {
+          id: "fallas-tecnicas",
+          categoria: "falla",
+          nivel: "Fallo técnico",
+          titulo: `${procesosConFalla} ${procesosConFalla === 1 ? "falla técnica necesita" : "fallas técnicas necesitan"} revisión`,
+          detalle: [
+            componentesConFalla?.map((component) => component.nombre).join(" · "),
+            control?.ordenes?.errores
+              ? `${control.ordenes.errores} ${control.ordenes.errores === 1 ? "orden manual terminó" : "órdenes manuales terminaron"} con error`
+              : "",
+          ].filter(Boolean).join(" · "),
+          destino: "control",
+          tono: "rose",
+          responsable: "Kevin",
+          fecha: componentesConFalla?.[0]?.fin || componentesConFalla?.[0]?.inicio,
+        }
+      : null,
+    ...(componentesConAviso || []).map((component) => ({
+      id: `resultado-${component.id}`,
+      categoria: "revision" as const,
+      nivel: "Requiere revisión",
+      titulo: `${component.nombre} encontró algo para revisar`,
+      detalle: (component.detalle ||
+        "La ejecución terminó; revisa el resultado, no el funcionamiento del bot.")
+        .replace(/\b1 diferencias\b/, "1 diferencia"),
+      destino: "control",
+      tono: "amber" as const,
+      responsable: "Alejandro",
+      fecha: component.fin || component.inicio,
+    })),
+    componentesDeCapacidad?.length
+      ? {
+          id: "capacidad",
+          categoria: "vigilar",
+          nivel: "Vigilar",
+          titulo: `${componentesDeCapacidad.length} ${componentesDeCapacidad.length === 1 ? "proceso se acerca" : "procesos se acercan"} al límite de tiempo`,
+          detalle: `${componentesDeCapacidad.map((component) => component.nombre).join(" · ")}. Siguen funcionando; es una advertencia preventiva.`,
+          destino: "control",
+          tono: "amber",
+          responsable: "Kevin",
+        }
+      : null,
+    ...(fuentesPendientes || []).map((source) => {
+      const guide = INPUT_GUIDES[source.id];
+      return {
+        id: `fuente-${source.id}`,
+        categoria: "informacion" as const,
+        nivel: "Falta información",
+        titulo: `${source.nombre || guide?.title || source.id} necesita revisión`,
+        detalle: source.ultima
+          ? `Último archivo: ${source.ultima}.`
+          : "Aún no tiene una medición confiable.",
+        destino: "archivos",
+        tono: "blue" as const,
+        responsable: guide?.owner || "Oficina",
+        fecha: source.ultima,
+      };
+    }),
+    zellesSinAsignar.length
+      ? {
+          id: "zelle-sin-asignar",
+          categoria: "informacion",
+          nivel: "Falta información",
+          titulo: `${zellesSinAsignar.length} ${zellesSinAsignar.length === 1 ? "Zelle no tiene" : "Zelle no tienen"} dueño`,
+          detalle: `${moneyExact(montoZelleSinAsignar)} en el periodo publicado. Falta identificar a quién pertenece cada pago.`,
+          destino: "zelle",
+          tono: "blue",
+          responsable: "Alejandro",
+          fecha: zellesSinAsignar.map((payment) => payment.fecha).filter(Boolean).sort()[0],
+        }
+      : null,
+    faltan.length
+      ? {
+          id: "cobertura",
+          categoria: "informacion",
+          nivel: "Falta información",
+          titulo: `${faltan.length} ${faltan.length === 1 ? "día del mes sigue" : "días del mes siguen"} sin medir`,
+          detalle:
+            medidos > 0
+              ? `Las cifras actuales corresponden a ${medidos} ${medidos === 1 ? "día medido" : "días medidos"}. Faltan ${faltan.slice(0, 5).join(", ")}${faltan.length > 5 ? "…" : ""}.`
+              : "Todavía no hay cifras que se puedan presentar como cero.",
+          destino: "operacion",
+          tono: "blue",
+          responsable: "Oficina",
+          fecha: faltan[0],
+        }
+      : null,
+  ].filter(Boolean) as PendingItem[];
+
+  return {
+    items,
+    componentesConAviso,
+    procesosConFalla,
+    fuentesPorRevisar: fuentesPendientes?.length ?? null,
+  };
+}
+
 export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }) {
   const [operacion, setOperacion] = useState<OfficeOperationData | null>(null);
   const [asistencia, setAsistencia] = useState<AttendanceData | null>(null);
@@ -1999,117 +2158,10 @@ export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }
   const cobertura = operacion?.cobertura || null;
   const trabajando = asistencia?.resumen?.trabajando ?? null;
   const agentes = asistencia?.agentes?.length ?? null;
-  /* `problemas` mezcla fallos actuales, órdenes fallidas, fuentes viejas y
-   * avisos de capacidad. Presentarlo entero como «procesos dañados» hacía que
-   * el inicio dijera 2 aunque las 12 tarjetas estuvieran verdes. */
-  const componentesConFalla = control?.ok
-    ? (control.componentes || []).filter((component) =>
-        ["ERROR", "CONGELADO", "ATRASADO"].includes(component.estado),
-      )
-    : null;
-  const componentesConAviso = control?.ok
-    ? (control.componentes || []).filter(
-        (component) => component.estado === "AVISO",
-      )
-    : null;
-  const procesosConFalla = componentesConFalla
-    ? componentesConFalla.length + (control?.ordenes?.errores || 0)
-    : null;
-  const avisosCapacidad = control?.ok
-    ? (control.componentes || []).filter((component) =>
-        ["AVISO", "CRITICO"].includes(component.capacidad?.estado || ""),
-      ).length
-    : null;
-  const fuentesPendientes = control?.ok
-    ? (control.fuentes || []).filter((source) =>
-        ["DESACTUALIZADO", "SIN_DISTINGUIR"].includes(source.estado),
-      )
-    : null;
-  const fuentesPorRevisar = fuentesPendientes?.length ?? null;
-  const zellesSinAsignar = (zelle?.pagos || []).filter(
-    (payment) =>
-      !String(payment.agente || "").trim() ||
-      String(payment.agente).trim().toUpperCase() === "SIN ASIGNAR",
-  );
-  const montoZelleSinAsignar = zellesSinAsignar.reduce(
-    (sum, payment) => sum + Number(payment.monto || 0),
-    0,
-  );
-  const atenciones = [
-    procesosConFalla
-      ? {
-          id: "fallas-tecnicas",
-          nivel: "Urgente",
-          titulo: `${procesosConFalla} ${procesosConFalla === 1 ? "falla técnica necesita" : "fallas técnicas necesitan"} revisión`,
-          detalle: "El proceso no terminó correctamente o quedó atrasado. Abre Control antes de intervenir.",
-          destino: "control",
-          tono: "rose",
-        }
-      : null,
-    ...(componentesConAviso || []).map((component) => ({
-      id: `resultado-${component.id}`,
-      nivel: "Resultado",
-      titulo: `${component.nombre} encontró algo para revisar`,
-      detalle: (component.detalle || "La ejecución terminó; revisa el resultado, no el funcionamiento del bot.")
-        .replace(/\b1 diferencias\b/, "1 diferencia"),
-      destino: "control",
-      tono: "amber" as const,
-    })),
-    avisosCapacidad
-      ? {
-          id: "capacidad",
-          nivel: "Vigilar",
-          titulo: `${avisosCapacidad} ${avisosCapacidad === 1 ? "proceso se acerca" : "procesos se acercan"} al límite de tiempo`,
-          detalle:
-            "Siguen funcionando; el aviso se activa por su duración histórica, no por un error actual.",
-          destino: "control",
-          tono: "amber",
-        }
-      : null,
-    ...(fuentesPendientes || []).map((source) => {
-      const guide = INPUT_GUIDES[source.id];
-      return {
-        id: `fuente-${source.id}`,
-        nivel: "Archivo",
-        titulo: `${source.nombre || guide?.title || source.id} necesita revisión`,
-        detalle: source.ultima
-          ? `Último archivo: ${source.ultima}. Responsable: ${guide?.owner || "oficina"}.`
-          : `Aún no tiene una medición confiable. Responsable: ${guide?.owner || "oficina"}.`,
-        destino: "archivos",
-        tono: "amber" as const,
-      };
-    }),
-    zellesSinAsignar.length
-      ? {
-          id: "zelle-sin-asignar",
-          nivel: "Asignar",
-          titulo: `${zellesSinAsignar.length} ${zellesSinAsignar.length === 1 ? "Zelle no tiene" : "Zelle no tienen"} dueño`,
-          detalle: `${moneyExact(montoZelleSinAsignar)} en el periodo publicado. Abre el detalle para identificar cada pago.`,
-          destino: "zelle",
-          tono: "amber",
-        }
-      : null,
-    faltan.length
-      ? {
-          id: "cobertura",
-          nivel: "Dato pendiente",
-          titulo: `${faltan.length} ${faltan.length === 1 ? "día del mes sigue" : "días del mes siguen"} sin medir`,
-          detalle:
-            medidos > 0
-              ? `Las cifras actuales corresponden a ${medidos} ${medidos === 1 ? "día medido" : "días medidos"}.`
-              : "Todavía no hay cifras que se puedan presentar como cero.",
-          destino: "operacion",
-          tono: "blue",
-        }
-      : null,
-  ].filter(Boolean) as Array<{
-    id: string;
-    nivel: string;
-    titulo: string;
-    detalle: string;
-    destino: string;
-    tono: "rose" | "amber" | "blue";
-  }>;
+  const resumenPendientes = construirPendientes(control, zelle, operacion);
+  const { componentesConAviso, procesosConFalla, fuentesPorRevisar } =
+    resumenPendientes;
+  const atenciones = resumenPendientes.items;
 
   return (
     <div className="flex flex-col gap-5">
@@ -2126,17 +2178,26 @@ export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }
               Qué necesita atención
             </h3>
           </div>
-          {!loading && (
-            <span
-              className={`rounded-full px-3 py-1 text-xs font-black ${
-                atenciones.length
-                  ? "bg-amber-100 text-amber-800"
-                  : "bg-emerald-100 text-emerald-800"
-              }`}
+          <div className="flex items-center gap-2">
+            {!loading && (
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-black ${
+                  atenciones.length
+                    ? "bg-amber-100 text-amber-800"
+                    : "bg-emerald-100 text-emerald-800"
+                }`}
+              >
+                {atenciones.length ? `${atenciones.length} por revisar` : "Todo operativo"}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => onNavigate("pendientes")}
+              className="rounded-lg px-2.5 py-1.5 text-xs font-black text-blue-700 hover:bg-blue-50"
             >
-              {atenciones.length ? `${atenciones.length} por revisar` : "Todo operativo"}
-            </span>
-          )}
+              Ver centro
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -2384,6 +2445,217 @@ export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }
             />
           </button>
         ))}
+      </section>
+    </div>
+  );
+}
+
+export function PendingCenter({
+  onNavigate,
+}: {
+  onNavigate: (view: string) => void;
+}) {
+  const rango = useMemo(() => mesEnCurso(new Date()), []);
+  const [control, setControl] = useState<ControlData | null>(null);
+  const [operacion, setOperacion] = useState<OfficeOperationData | null>(null);
+  const [zelle, setZelle] = useState<ZelleData | null>(() => readCache("zelle"));
+  const [loading, setLoading] = useState(true);
+  const [consultasFallidas, setConsultasFallidas] = useState<string[]>([]);
+  const [filtro, setFiltro] = useState<"todos" | PendingCategory>("todos");
+
+  const load = async (force = false) => {
+    setLoading(true);
+    const resultados = await Promise.allSettled([
+      callTool<ControlData>("consola", "centroControl", [], force),
+      callTool<OfficeOperationData>(
+        "consola",
+        "operacionPorOficina",
+        [rango.desde, rango.hasta],
+        force,
+      ),
+      callTool<ZelleData>("zelle", "datos", [], force),
+    ]);
+    const fallidas: string[] = [];
+    const [ctl, ope, zel] = resultados;
+    if (ctl.status === "fulfilled" && ctl.value?.ok) setControl(ctl.value);
+    else {
+      setControl(null);
+      fallidas.push("Control del bot");
+    }
+    if (ope.status === "fulfilled" && ope.value?.ok) {
+      setOperacion(ope.value);
+      writeCache(claveOperacion(rango.desde, rango.hasta), ope.value);
+    } else {
+      setOperacion(null);
+      fallidas.push("Operación por oficina");
+    }
+    if (zel.status === "fulfilled") {
+      setZelle(zel.value);
+      writeCache("zelle", zel.value);
+    } else {
+      if (!zelle) setZelle(null);
+      fallidas.push("Zelle");
+    }
+    setConsultasFallidas(fallidas);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    void load();
+  }, [rango.desde, rango.hasta]);
+
+  const resumen = construirPendientes(control, zelle, operacion);
+  const conteos: Record<PendingCategory, number> = {
+    informacion: resumen.items.filter((item) => item.categoria === "informacion").length,
+    revision: resumen.items.filter((item) => item.categoria === "revision").length,
+    falla: resumen.items.filter((item) => item.categoria === "falla").length,
+    vigilar: resumen.items.filter((item) => item.categoria === "vigilar").length,
+  };
+  const visibles =
+    filtro === "todos"
+      ? resumen.items
+      : resumen.items.filter((item) => item.categoria === filtro);
+  const filtros: Array<{
+    id: "todos" | PendingCategory;
+    label: string;
+    count: number;
+    tone: string;
+  }> = [
+    { id: "todos", label: "Todos", count: resumen.items.length, tone: "text-slate-900" },
+    { id: "falla", label: "Fallas", count: conteos.falla, tone: "text-rose-700" },
+    { id: "revision", label: "Revisión", count: conteos.revision, tone: "text-amber-700" },
+    { id: "informacion", label: "Información", count: conteos.informacion, tone: "text-blue-700" },
+    { id: "vigilar", label: "Vigilar", count: conteos.vigilar, tone: "text-violet-700" },
+  ];
+  const colores = {
+    rose: "border-rose-200 bg-rose-50 text-rose-800",
+    amber: "border-amber-200 bg-amber-50 text-amber-800",
+    blue: "border-blue-200 bg-blue-50 text-blue-800",
+  };
+
+  return (
+    <div className="flex flex-col gap-5">
+      <LoadingBar active={loading} />
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#003D9C] via-[#0057d9] to-[#4732B8] p-6 text-white shadow-lg md:p-8">
+        <div className="relative z-10 max-w-3xl">
+          <p className="text-[11px] font-black uppercase tracking-[.18em] text-blue-100">
+            Una sola bandeja
+          </p>
+          <h3 className="mt-2 text-2xl font-black md:text-3xl">
+            Centro de pendientes
+          </h3>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-blue-100">
+            Separa lo que necesita información, revisión humana o atención
+            técnica. Cada renglón abre la vista donde se investiga; aquí no se
+            corrige ningún libro ni se ejecuta el bot.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void load(true)}
+          disabled={loading}
+          className="relative z-10 mt-5 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-black text-blue-800 shadow-sm hover:bg-blue-50 disabled:opacity-60 md:absolute md:right-8 md:top-8 md:mt-0"
+        >
+          <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+          Actualizar
+        </button>
+      </section>
+
+      {consultasFallidas.length > 0 && !loading && (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          <p className="font-black">La bandeja está incompleta.</p>
+          <p className="mt-1">
+            No respondieron: {consultasFallidas.join(", ")}. Los demás
+            pendientes siguen visibles; no se interpretó el silencio como cero.
+          </p>
+        </div>
+      )}
+
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {filtros.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => setFiltro(item.id)}
+            aria-pressed={filtro === item.id}
+            className={`rounded-2xl border bg-white p-4 text-left shadow-sm transition hover:border-blue-300 ${filtro === item.id ? "border-blue-400 ring-2 ring-blue-100" : "border-slate-100"}`}
+          >
+            <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+              {item.label}
+            </p>
+            <p className={`mt-2 text-3xl font-black tabular-nums ${item.tone}`}>
+              {loading ? "—" : item.count}
+            </p>
+          </button>
+        ))}
+      </section>
+
+      <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[.12em] text-blue-700">
+              Trabajo pendiente
+            </p>
+            <h3 className="mt-1 text-lg font-black text-slate-950">
+              {filtro === "todos"
+                ? "Todo lo que requiere atención"
+                : filtros.find((item) => item.id === filtro)?.label}
+            </h3>
+          </div>
+          {!loading && (
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700">
+              {visibles.length} {visibles.length === 1 ? "pendiente" : "pendientes"}
+            </span>
+          )}
+        </div>
+
+        {loading ? (
+          <div className="p-5">
+            <EsqueletoFilas cuantas={4} etiqueta="Reuniendo pendientes" />
+          </div>
+        ) : visibles.length ? (
+          <div className="divide-y divide-slate-100">
+            {visibles.map((item) => (
+              <div key={item.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-start">
+                <span className={`w-fit rounded-lg border px-2 py-1 text-[10px] font-black uppercase tracking-wide ${colores[item.tono]}`}>
+                  {item.nivel}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-black text-slate-950">{item.titulo}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                    {item.detalle}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-semibold text-slate-500">
+                    <span>Responsable: {item.responsable}</span>
+                    {item.fecha && (
+                      <span>Referencia: {fechaHumana(String(item.fecha).slice(0, 10))}</span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onNavigate(item.destino)}
+                  className="inline-flex shrink-0 items-center justify-center gap-1 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-black text-white hover:bg-blue-700"
+                >
+                  Abrir
+                  <ChevronRight size={15} />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 p-5 text-emerald-800">
+            <CheckCircle2 size={22} className="shrink-0" />
+            <div>
+              <p className="text-sm font-black">No hay pendientes en esta categoría</p>
+              <p className="mt-0.5 text-xs text-emerald-700">
+                {consultasFallidas.length
+                  ? "No hay elementos visibles de las fuentes que sí respondieron; la advertencia superior indica qué falta consultar."
+                  : "El cero significa que las tres fuentes sí respondieron y no reportaron nada para este filtro."}
+              </p>
+            </div>
+          </div>
+        )}
       </section>
     </div>
   );
