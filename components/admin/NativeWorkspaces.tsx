@@ -1911,7 +1911,7 @@ export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }
       ? {
           id: "cobertura",
           nivel: "Dato pendiente",
-          titulo: `${faltan.length} de ${operacion?.diasPedidos || 0} días del mes sin medir`,
+          titulo: `${faltan.length} ${faltan.length === 1 ? "día del mes sigue" : "días del mes siguen"} sin medir`,
           detalle:
             medidos > 0
               ? `Las cifras actuales corresponden a ${medidos} ${medidos === 1 ? "día medido" : "días medidos"}.`
@@ -2039,7 +2039,7 @@ export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }
         <Metric
           label="Fuentes por revisar"
           value={fuentesPorRevisar === null ? "—" : fuentesPorRevisar}
-          hint={fuentesPorRevisar === null ? "no se pudo leer el control" : fuentesPorRevisar ? "revisar Entrada Karla" : "todas al día"}
+          hint={fuentesPorRevisar === null ? "no se pudo leer el control" : fuentesPorRevisar ? "abrir alertas de archivos" : "todas al día"}
           tone={fuentesPorRevisar ? "amber" : "green"}
         />
       </section>
