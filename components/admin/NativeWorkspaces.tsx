@@ -20,6 +20,7 @@ import {
   UsersRound,
   WalletCards,
 } from "lucide-react";
+import { leerJsonSeguro } from "./http";
 
 type ConsoleSummary = {
   ok: boolean;
@@ -723,16 +724,15 @@ async function callTool<T>(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action, args, force }),
   });
-  const output = await response.text();
-  let data;
-  try {
-    data = JSON.parse(output);
-  } catch {
-    throw new Error(
-      "La sección no pudo terminar a tiempo. Intenta actualizarla en unos minutos.",
-    );
-  }
-  if (!response.ok || !data.ok)
+  const data = await leerJsonSeguro<{
+    ok?: boolean;
+    result?: T;
+    error?: string;
+  }>(
+    response,
+    "La sección no pudo terminar a tiempo. Intenta actualizarla en unos minutos.",
+  );
+  if (!data.ok)
     throw new Error(data.error || "La herramienta no respondió.");
   return data.result as T;
 }
@@ -2978,8 +2978,11 @@ export function NativeConsole() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ vin: normalized }),
       });
-      const data = await response.json();
-      if (!response.ok || !data.ok) {
+      const data = await leerJsonSeguro<VinResult & { error?: string }>(
+        response,
+        "No se pudo decodificar el VIN.",
+      );
+      if (!data.ok) {
         throw new Error(data.error || "No se pudo decodificar el VIN.");
       }
       setVinResult(data);

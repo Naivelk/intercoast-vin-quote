@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import MascotImage from "../eva/MascotImage";
+import { leerJsonSeguro } from "./http";
 
 export type AdminLead = {
   row: number;
@@ -347,8 +348,13 @@ export function DiagnosticsPanel() {
     setSelected(id);
     try {
       const response = await fetch(`/api/admin/diagnostic?fn=${encodeURIComponent(id)}`, { credentials: "include" });
-      const data = await response.json();
-      if (!response.ok || !data.ok) throw new Error(data.error || "El diagnóstico no respondió.");
+      const data = await leerJsonSeguro<{
+        ok?: boolean;
+        output?: string;
+        ranAt?: string;
+        error?: string;
+      }>(response, "El diagnóstico no respondió.");
+      if (!data.ok) throw new Error(data.error || "El diagnóstico no respondió.");
       setResults((current) => ({ ...current, [id]: { text: data.output || "Diagnóstico completado sin observaciones.", ranAt: data.ranAt || new Date().toISOString() } }));
     } catch (error) {
       setResults((current) => ({ ...current, [id]: { text: error instanceof Error ? error.message : "No se pudo ejecutar.", ranAt: new Date().toISOString() } }));

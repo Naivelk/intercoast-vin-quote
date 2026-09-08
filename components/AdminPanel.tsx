@@ -4,6 +4,7 @@ import {
   handleAuthCallback,
   login,
   logout,
+  refreshSession,
   signup,
 } from "@netlify/identity";
 import MascotImage from "./eva/MascotImage";
@@ -26,6 +27,11 @@ import {
   GlobalSearch,
   WorkCenter,
 } from "./admin/AdminEnhancements";
+import {
+  leerJsonSeguro,
+  MENSAJE_SESION,
+  sesionPrivadaVigente,
+} from "./admin/http";
 import {
   Activity,
   Bot,
@@ -813,8 +819,10 @@ export default function AdminPanel() {
     setLoading(true);
     try {
       const r = await fetch("/api/admin/leads", { credentials: "include" });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error);
+      const d = await leerJsonSeguro<{ leads?: Lead[]; error?: string }>(
+        r,
+        "No se pudieron cargar los leads.",
+      );
       setLeads(d.leads || []);
     } catch (e) {
       setMessage(
@@ -830,9 +838,10 @@ export default function AdminPanel() {
       const response = await fetch("/api/admin/retention", {
         credentials: "include",
       });
-      const data = await response.json();
-      if (!response.ok)
-        throw new Error(data.error || "No se pudo cargar la operación.");
+      const data = await leerJsonSeguro<RetentionSnapshot & { error?: string }>(
+        response,
+        "No se pudo cargar la operación.",
+      );
       setRetention(data);
     } catch (error) {
       setMessage(
@@ -850,9 +859,10 @@ export default function AdminPanel() {
       const response = await fetch("/api/admin/audit", {
         credentials: "include",
       });
-      const data = await response.json();
-      if (!response.ok)
-        throw new Error(data.error || "No se pudo cargar el historial.");
+      const data = await leerJsonSeguro<{
+        entries?: AuditEntry[];
+        error?: string;
+      }>(response, "No se pudo cargar el historial.");
       setAuditEntries(data.entries || []);
     } catch (error) {
       setMessage(
@@ -872,9 +882,13 @@ export default function AdminPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, entity, detail }),
       });
-      const data = await response.json();
-      if (response.ok && data.entry)
-        setAuditEntries((current) => [data.entry, ...current].slice(0, 200));
+      const data = await leerJsonSeguro<{ entry?: AuditEntry; error?: string }>(
+        response,
+        "No se pudo registrar el cambio.",
+      );
+      const entry = data.entry;
+      if (entry)
+        setAuditEntries((current) => [entry, ...current].slice(0, 200));
     } catch {
       // El cambio principal no debe fallar si el registro está temporalmente caído.
     }
@@ -884,9 +898,22 @@ export default function AdminPanel() {
       try {
         await handleAuthCallback();
       } catch {}
+      /* El JWT dura una hora. Si el panel quedó abierto o el navegador restauró
+       * una pestaña vieja, renovarlo antes de lanzar todas las lecturas evita
+       * una pantalla autenticada por fuera pero con ocho respuestas 403 por
+       * dentro. `refreshSession` no hace nada si el token todavía está fresco. */
+      try {
+        await refreshSession();
+      } catch {}
       const current = await getUser();
       const normalized = String(current?.email || "").toLowerCase();
       if (ALLOWED.has(normalized)) {
+        if (!(await sesionPrivadaVigente())) {
+          await logout();
+          setMessage(MENSAJE_SESION);
+          setLoading(false);
+          return;
+        }
         setUser(normalized);
         await Promise.all([load(), loadRetention()]);
       } else setLoading(false);
@@ -1006,6 +1033,10 @@ export default function AdminPanel() {
         await signup(normalized, password);
         return setMessage("Revisa tu correo y confirma la cuenta.");
       }
+      if (!(await sesionPrivadaVigente())) {
+        await logout();
+        return setMessage(MENSAJE_SESION);
+      }
       setUser(normalized);
       await Promise.all([load(), loadRetention()]);
     } catch (err) {
@@ -1016,35 +1047,45 @@ export default function AdminPanel() {
   };
   const save = async () => {
     if (!selected) return;
-    const previous = leads.find((lead) => lead.row === selected.row);
-    const r = await fetch("/api/admin/leads", {
-      method: "PUT",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(selected),
-    });
-    const d = await r.json();
-    if (!r.ok) return setMessage(d.error || "No se pudo guardar.");
-    setLeads((items) => items.map((l) => (l.row === d.lead.row ? d.lead : l)));
-    setSelected(d.lead);
-    setMessage("Lead actualizado correctamente.");
-    const changes = [
-      previous?.estado !== d.lead.estado
-        ? `estado: ${previous?.estado || "Nuevo"} → ${d.lead.estado || "Nuevo"}`
-        : "",
-      previous?.asesor !== d.lead.asesor
-        ? `asesor: ${previous?.asesor || "Sin asignar"} → ${d.lead.asesor || "Sin asignar"}`
-        : "",
-      previous?.proximoSeguimiento !== d.lead.proximoSeguimiento
-        ? "seguimiento actualizado"
-        : "",
-      previous?.notas !== d.lead.notas ? "notas actualizadas" : "",
-    ].filter(Boolean);
-    void recordAudit(
-      "Lead actualizado",
-      d.lead.nombre || `Fila ${d.lead.row}`,
-      changes.join(" · ") || "Registro guardado sin cambios visibles",
-    );
+    try {
+      const previous = leads.find((lead) => lead.row === selected.row);
+      const r = await fetch("/api/admin/leads", {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(selected),
+      });
+      const d = await leerJsonSeguro<{ lead: Lead; error?: string }>(
+        r,
+        "No se pudo guardar.",
+      );
+      setLeads((items) =>
+        items.map((l) => (l.row === d.lead.row ? d.lead : l)),
+      );
+      setSelected(d.lead);
+      setMessage("Lead actualizado correctamente.");
+      const changes = [
+        previous?.estado !== d.lead.estado
+          ? `estado: ${previous?.estado || "Nuevo"} → ${d.lead.estado || "Nuevo"}`
+          : "",
+        previous?.asesor !== d.lead.asesor
+          ? `asesor: ${previous?.asesor || "Sin asignar"} → ${d.lead.asesor || "Sin asignar"}`
+          : "",
+        previous?.proximoSeguimiento !== d.lead.proximoSeguimiento
+          ? "seguimiento actualizado"
+          : "",
+        previous?.notas !== d.lead.notas ? "notas actualizadas" : "",
+      ].filter(Boolean);
+      void recordAudit(
+        "Lead actualizado",
+        d.lead.nombre || `Fila ${d.lead.row}`,
+        changes.join(" · ") || "Registro guardado sin cambios visibles",
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "No se pudo guardar.",
+      );
+    }
   };
   const csv = () => {
     const rows = [
@@ -1400,9 +1441,27 @@ export default function AdminPanel() {
           ))}
         </nav>
         {message && (
-          <p className="mb-5 rounded-xl bg-blue-50 p-3 text-sm text-blue-800">
-            {message}
-          </p>
+          <div
+            className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-blue-50 p-3 text-sm text-blue-800"
+            role="status"
+          >
+            <span>{message}</span>
+            {message === MENSAJE_SESION && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const anterior = user;
+                  await logout();
+                  setEmail(anterior);
+                  setPassword("");
+                  setUser("");
+                }}
+                className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-black text-white"
+              >
+                Volver a entrar
+              </button>
+            )}
+          </div>
         )}
         {view === "trabajo" && (
           <WorkCenter
