@@ -1885,7 +1885,8 @@ export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }
       id: `resultado-${component.id}`,
       nivel: "Resultado",
       titulo: `${component.nombre} encontró algo para revisar`,
-      detalle: component.detalle || "La ejecución terminó; revisa el resultado, no el funcionamiento del bot.",
+      detalle: (component.detalle || "La ejecución terminó; revisa el resultado, no el funcionamiento del bot.")
+        .replace(/\b1 diferencias\b/, "1 diferencia"),
       destino: "control",
       tono: "amber" as const,
     })),
