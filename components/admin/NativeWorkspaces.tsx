@@ -855,11 +855,15 @@ function Metric({
   value,
   hint,
   tone = "blue",
+  onClick,
+  active = false,
 }: {
   label: string;
   value: React.ReactNode;
   hint: string;
   tone?: "blue" | "green" | "violet" | "amber";
+  onClick?: () => void;
+  active?: boolean;
 }) {
   const tones = {
     blue: "bg-blue-600",
@@ -867,8 +871,8 @@ function Metric({
     violet: "bg-violet-600",
     amber: "bg-amber-500",
   };
-  return (
-    <article className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+  const content = (
+    <>
       <div className={`h-1 ${tones[tone]}`} />
       <div className="p-4">
         <p className="text-[11px] font-black uppercase tracking-wider text-slate-500">
@@ -885,7 +889,33 @@ function Metric({
           )}
         </p>
         <p className="mt-1 text-xs text-slate-500">{hint}</p>
+        {onClick && (
+          <span className="mt-3 inline-flex items-center gap-1 text-xs font-black text-blue-700">
+            Ver por día
+            <ChevronDown
+              size={14}
+              className={`transition-transform ${active ? "rotate-180" : ""}`}
+            />
+          </span>
+        )}
       </div>
+    </>
+  );
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        aria-expanded={active}
+        className={`overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 ${active ? "border-blue-400 ring-2 ring-blue-100" : "border-slate-100"}`}
+      >
+        {content}
+      </button>
+    );
+  }
+  return (
+    <article className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+      {content}
     </article>
   );
 }
@@ -960,6 +990,7 @@ type OfficeOperationOffice = {
   oficina: string;
   dias: string[];
   diasParciales: string[];
+  detalleDias: OfficeOperationDay[];
   fiduciary: number;
   apps: number;
   endos: number;
@@ -970,6 +1001,35 @@ type OfficeOperationOffice = {
     | { disponible: true; nb: number; rw: number }
     | { disponible: false; motivo: string; dias: string[] };
 };
+
+type OfficeOperationDay = {
+  fecha: string;
+  fiduciary: number | "";
+  apps: number | "";
+  nb: number | "";
+  rw: number | "";
+  endos: number | "";
+  ccNum: number | "";
+  ccMonto: number | "";
+  deposit: number | "";
+  parcial: boolean;
+  desgloseNota: string;
+  medido: string;
+};
+
+type OperationMetric = "fiduciary" | "deposit" | "apps" | "endos";
+
+const OPERATION_METRIC_LABELS: Record<OperationMetric, string> = {
+  fiduciary: "Fiduciary",
+  deposit: "Deposit calculado",
+  apps: "Aplicaciones",
+  endos: "Endosos y tarjetas",
+};
+
+function datoDiario(value: number | "", formato: "dinero" | "numero") {
+  if (value === "" || !Number.isFinite(value)) return "Sin dato";
+  return formato === "dinero" ? moneyExact(value) : String(value);
+}
 
 type OfficeOperationData = {
   ok: boolean;
@@ -1056,7 +1116,9 @@ function operationRange(period: OperationPeriod, reference: Date) {
 /** La clave del caché de esta vista. Una por rango: cambiar de día o de mes es
  *  otra pregunta, y mezclarlas enseñaría números de otra semana. */
 const claveOperacion = (desde: string, hasta: string) =>
-  `operacion-${desde}-${hasta}`;
+  /* v2 añade `detalleDias`; no se reutiliza un caché viejo que solo tenía los
+   * totales porque abriría una caja vacía hasta terminar el refresco. */
+  `operacion-v2-${desde}-${hasta}`;
 
 export function OfficeOperation() {
   const [period, setPeriod] = useState<OperationPeriod>("dia");
@@ -1070,6 +1132,10 @@ export function OfficeOperation() {
   );
   const [loading, setLoading] = useState(!data);
   const [error, setError] = useState("");
+  const [detalleAbierto, setDetalleAbierto] = useState<{
+    oficina: string;
+    metrica: OperationMetric;
+  } | null>(null);
 
   const range = useMemo(
     () => operationRange(period, reference),
@@ -1114,6 +1180,7 @@ export function OfficeOperation() {
   };
 
   useEffect(() => {
+    setDetalleAbierto(null);
     void load(range);
   }, [range.desde, range.hasta]);
 
@@ -1288,6 +1355,16 @@ export function OfficeOperation() {
         <div className="grid gap-5 xl:grid-cols-2">
           {oficinas.map((office) => {
             const parcial = office.diasParciales.length > 0;
+            const abrirDetalle = (metrica: OperationMetric) =>
+              setDetalleAbierto((actual) =>
+                actual?.oficina === office.oficina && actual.metrica === metrica
+                  ? null
+                  : { oficina: office.oficina, metrica },
+              );
+            const detalle =
+              detalleAbierto?.oficina === office.oficina
+                ? detalleAbierto.metrica
+                : null;
             return (
               <section
                 key={office.oficina}
@@ -1315,12 +1392,16 @@ export function OfficeOperation() {
                     label="Fiduciary"
                     value={moneyExact(office.fiduciary)}
                     hint={`sobre ${office.dias.length} días medidos`}
+                    onClick={() => abrirDetalle("fiduciary")}
+                    active={detalle === "fiduciary"}
                   />
                   <Metric
                     label="Deposit calculado"
                     value={moneyExact(office.deposit)}
                     hint="lo que le corresponde rendir"
                     tone="green"
+                    onClick={() => abrirDetalle("deposit")}
+                    active={detalle === "deposit"}
                   />
                   <Metric
                     label="Aplicaciones"
@@ -1331,14 +1412,98 @@ export function OfficeOperation() {
                         : "sin desglose NB/REWRITE"
                     }
                     tone="violet"
+                    onClick={() => abrirDetalle("apps")}
+                    active={detalle === "apps"}
                   />
                   <Metric
                     label="Endosos"
                     value={office.endos}
                     hint={`${office.ccNum} tarjetas · ${moneyExact(office.ccMonto)}`}
                     tone="amber"
+                    onClick={() => abrirDetalle("endos")}
+                    active={detalle === "endos"}
                   />
                 </div>
+
+                {detalle && (
+                  <div className="mt-4 overflow-hidden rounded-2xl border border-blue-200 bg-white shadow-sm">
+                    <div className="flex items-center justify-between gap-3 border-b border-blue-100 bg-blue-50 px-4 py-3">
+                      <div>
+                        <p className="text-[11px] font-black uppercase tracking-wider text-blue-700">
+                          Detalle diario
+                        </p>
+                        <h5 className="text-sm font-black text-slate-950">
+                          {OPERATION_METRIC_LABELS[detalle]} · {office.oficina}
+                        </h5>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setDetalleAbierto(null)}
+                        className="rounded-lg px-3 py-1.5 text-xs font-black text-blue-700 hover:bg-blue-100"
+                      >
+                        Cerrar
+                      </button>
+                    </div>
+                    <div className="divide-y divide-slate-100">
+                      {(office.detalleDias || []).map((dia) => {
+                        let valor = "";
+                        let contexto = "";
+                        if (detalle === "fiduciary") {
+                          valor = datoDiario(dia.fiduciary, "dinero");
+                          contexto = "Fiduciary publicado por el bot";
+                        } else if (detalle === "deposit") {
+                          valor = datoDiario(dia.deposit, "dinero");
+                          contexto = "Neto calculado para rendir";
+                        } else if (detalle === "apps") {
+                          valor = datoDiario(dia.apps, "numero");
+                          contexto =
+                            dia.nb === "" || dia.rw === ""
+                              ? dia.desgloseNota || "Sin desglose NB/REWRITE"
+                              : `${dia.nb} NB · ${dia.rw} REWRITE`;
+                        } else {
+                          const endosDia = datoDiario(dia.endos, "numero");
+                          valor =
+                            endosDia === "Sin dato"
+                              ? endosDia
+                              : `${endosDia} endosos`;
+                          contexto =
+                            dia.ccNum === "" || dia.ccMonto === ""
+                              ? "Tarjetas sin dato completo"
+                              : `${dia.ccNum} tarjetas · ${moneyExact(dia.ccMonto)}`;
+                        }
+                        return (
+                          <div
+                            key={`${office.oficina}-${detalle}-${dia.fecha}`}
+                            className="grid gap-2 px-4 py-3 sm:grid-cols-[minmax(9rem,1fr)_minmax(8rem,1fr)_minmax(12rem,1.4fr)] sm:items-center"
+                          >
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-sm font-black text-slate-900">
+                                {fechaHumana(dia.fecha, "larga")}
+                              </span>
+                              {dia.parcial && (
+                                <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-black uppercase text-amber-800">
+                                  Parcial
+                                </span>
+                              )}
+                            </div>
+                            <span className={`text-sm font-black ${valor === "Sin dato" ? "text-amber-700" : "text-slate-950"}`}>
+                              {valor}
+                            </span>
+                            <span className="text-xs text-slate-500">
+                              {contexto}
+                              {dia.medido ? ` · medido ${dia.medido}` : ""}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="border-t border-slate-100 bg-slate-50 px-4 py-3 text-xs text-slate-500">
+                      Son los valores diarios que forman el total. Esta vista no
+                      recalcula ni modifica los libros y no baja a recibos
+                      individuales porque esa evidencia no existe en esta capa.
+                    </p>
+                  </div>
+                )}
 
                 {/* El desglose que no se sostiene se escribe, nunca se pinta
                     como 0 / 0: sumar los días que sí lo traen daría una cifra
