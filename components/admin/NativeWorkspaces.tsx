@@ -1063,17 +1063,18 @@ export function OfficeOperation() {
     [period, reference],
   );
 
-  const load = async (selected = range) => {
+  const load = async (selected = range, force = false) => {
     const clave = claveOperacion(selected.desde, selected.hasta);
     const guardado = readCache<OfficeOperationData>(clave);
-    if (guardado) setData(guardado);
+    if (guardado && !force) setData(guardado);
     /* Con algo que enseñar, el refresco va callado. Ver la nota de `loadPart`. */
-    if (!guardado) setLoading(true);
+    if (!guardado || force) setLoading(true);
     try {
       const value = await callTool<OfficeOperationData>(
         "consola",
         "operacionPorOficina",
         [selected.desde, selected.hasta],
+        force,
       );
       if (!value.ok)
         throw new Error(
@@ -1138,7 +1139,7 @@ export function OfficeOperation() {
             </div>
           </div>
           <button
-            onClick={() => void load(range)}
+            onClick={() => void load(range, true)}
             disabled={loading}
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-800 hover:border-blue-300 hover:bg-blue-50 disabled:opacity-60"
           >
@@ -1779,7 +1780,7 @@ export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }
 
   const rango = useMemo(() => mesEnCurso(new Date()), []);
 
-  const load = async () => {
+  const load = async (force = false) => {
     setLoading(true);
     /* Los tres bloques son independientes a propósito: que Dropbox no conteste
      * no puede dejar al manager sin ver quién está trabajando. */
@@ -1787,9 +1788,9 @@ export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }
       callTool<OfficeOperationData>("consola", "operacionPorOficina", [
         rango.desde,
         rango.hasta,
-      ]),
+      ], force),
       callTool<AttendanceData>("consola", "resumenAsistencia", ["hoy"], true),
-      callTool<ControlData>("consola", "centroControl", []),
+      callTool<ControlData>("consola", "centroControl", [], force),
     ]);
     setOperacion(ope.status === "fulfilled" && ope.value?.ok ? ope.value : null);
     setAsistencia(asis.status === "fulfilled" && asis.value?.ok ? asis.value : null);
@@ -2014,7 +2015,7 @@ export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }
               <ChevronRight size={16} />
             </button>
             <button
-              onClick={() => void load()}
+              onClick={() => void load(true)}
               disabled={loading}
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-800 hover:border-blue-300 hover:bg-blue-50 disabled:opacity-60"
             >
