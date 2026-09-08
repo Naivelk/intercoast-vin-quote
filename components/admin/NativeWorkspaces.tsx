@@ -279,6 +279,7 @@ type ControlComponent = {
   fin: string;
   duracion: string;
   detalle: string;
+  origen?: string;
   capacidad?: {
     estado: string;
     ultimo: number;
@@ -288,6 +289,17 @@ type ControlComponent = {
     muestras: number;
     porcentajeUltimo: number;
   } | null;
+};
+type ControlActivity = {
+  id: string;
+  componente: string;
+  nombre: string;
+  estado: string;
+  inicio: string;
+  fin: string;
+  duracion: string;
+  detalle: string;
+  origen: string;
 };
 type ControlSource = {
   id: string;
@@ -329,6 +341,7 @@ type ControlData = {
   };
   fuentes?: ControlSource[];
   tendencias?: ControlTrend[];
+  actividad?: ControlActivity[];
   carpetaReportesUrl?: string;
   mensaje?: string;
 };
@@ -2679,35 +2692,62 @@ export function SystemControl() {
         <div className="border-b border-slate-100 p-5">
           <h4 className="text-xl font-black">Actividad reciente</h4>
           <p className="text-sm text-slate-500">
-            Historial de órdenes enviadas desde este panel.
+            Ejecuciones terminadas y órdenes manuales, sin datos de clientes.
           </p>
         </div>
-        <div className="divide-y divide-slate-100">
-          {(data?.ordenes.recientes || []).map((order) => (
-            <div
-              key={order.id}
-              className="flex flex-wrap items-center justify-between gap-3 p-4"
-            >
-              <div>
-                <code className="font-black text-blue-700">
-                  {order.comando}
-                </code>
-                <p className="mt-1 text-xs text-slate-500">
-                  {order.error || order.resultado || order.creada}
-                </p>
-              </div>
-              <span
-                className={`rounded-full border px-3 py-1 text-[11px] font-black ${statusStyle(order.estado === "ERROR" ? "ERROR" : ["PENDIENTE", "EJECUTANDO"].includes(order.estado) ? "AVISO" : "OK")}`}
-              >
-                {order.estado}
-              </span>
-            </div>
-          ))}
-          {!data?.ordenes.recientes.length && (
-            <p className="p-8 text-center text-sm text-slate-500">
-              Todavía no hay órdenes hechas desde la página.
+        <div className="grid divide-y divide-slate-100 lg:grid-cols-2 lg:divide-x lg:divide-y-0">
+          <div>
+            <p className="border-b border-slate-100 px-5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-500">
+              Procesos terminados
             </p>
-          )}
+            <div className="max-h-[420px] divide-y divide-slate-100 overflow-auto">
+              {(data?.actividad || []).map((item) => (
+                <div key={`${item.id}-${item.componente}`} className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-black text-slate-950">{item.nombre}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {item.fin || item.inicio}{item.duracion ? ` · ${item.duracion} s` : ""}
+                      </p>
+                    </div>
+                    <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-black ${statusStyle(item.estado)}`}>
+                      {item.estado}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+                    <span className="rounded-md bg-slate-100 px-2 py-1 font-black text-slate-600">
+                      {item.origen === "WEB" ? "MANUAL · PANEL" : item.origen.replaceAll("_", " ")}
+                    </span>
+                    <span className="text-slate-500">{item.detalle || "Ejecución registrada"}</span>
+                  </div>
+                </div>
+              ))}
+              {!data?.actividad?.length && (
+                <p className="p-8 text-center text-sm text-slate-500">Todavía no hay ejecuciones registradas.</p>
+              )}
+            </div>
+          </div>
+          <div>
+            <p className="border-b border-slate-100 px-5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-500">
+              Órdenes desde el panel
+            </p>
+            <div className="max-h-[420px] divide-y divide-slate-100 overflow-auto">
+              {(data?.ordenes.recientes || []).map((order) => (
+                <div key={order.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
+                  <div>
+                    <code className="font-black text-blue-700">{order.comando}</code>
+                    <p className="mt-1 text-xs text-slate-500">{order.error || order.resultado || order.creada}</p>
+                  </div>
+                  <span className={`rounded-full border px-3 py-1 text-[11px] font-black ${statusStyle(order.estado === "ERROR" ? "ERROR" : ["PENDIENTE", "EJECUTANDO"].includes(order.estado) ? "AVISO" : "OK")}`}>
+                    {order.estado}
+                  </span>
+                </div>
+              ))}
+              {!data?.ordenes.recientes.length && (
+                <p className="p-8 text-center text-sm text-slate-500">Todavía no hay órdenes hechas desde la página.</p>
+              )}
+            </div>
+          </div>
         </div>
       </article>
     </section>
@@ -2769,6 +2809,11 @@ export function ManagerFiles() {
     const f = data?.fuentes?.find((x) => x.id === archivo.fuente);
     return { estado: f?.estado || "SIN MEDIR", momento: f?.ultima || "" };
   };
+  const respaldo = data?.componentes?.find((x) => x.id === "respaldos_nomina");
+  const simulacro = data?.componentes?.find((x) => x.id === "simulacro_nomina");
+  const fuentesPendientes = (data?.fuentes || []).filter((x) => x.estado !== "OK");
+  const respaldoBien = respaldo?.estado === "OK";
+  const simulacroBien = simulacro?.estado === "OK";
 
   return (
     <section className="space-y-5">
@@ -2810,12 +2855,82 @@ export function ManagerFiles() {
             );
           })}
         </div>
-        <a href="https://drive.google.com/drive/folders/1velct65gOyO4qo2EnYh5o6IdwehZUuxz"
-          target="_blank" rel="noreferrer"
-          className="mt-5 inline-flex items-center gap-2 rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-black text-white">
-          <FolderOpen size={17} /> Ver todos los archivos y respaldos
-          <ExternalLink size={15} />
-        </a>
+        <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_auto]">
+          <div className={`rounded-2xl border p-4 ${respaldoBien && simulacroBien ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-wider text-slate-600">Recuperación de nómina</p>
+                <h3 className="mt-1 text-lg font-black text-slate-950">Salud de respaldos</h3>
+              </div>
+              <span className={`rounded-full px-3 py-1 text-[10px] font-black ${respaldoBien && simulacroBien ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+                {respaldo && simulacro ? (respaldoBien && simulacroBien ? "PROTEGIDO" : "REVISAR") : "SIN MEDIR"}
+              </span>
+            </div>
+            <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+              <div className="rounded-xl bg-white/80 p-3">
+                <p className="font-black text-slate-800">Último respaldo</p>
+                <p className="mt-1 text-slate-600">{respaldo?.detalle || "Esperando la primera medición"}</p>
+                {respaldo?.fin ? <p className="mt-1 font-semibold text-slate-500">{respaldo.fin}</p> : null}
+              </div>
+              <div className="rounded-xl bg-white/80 p-3">
+                <p className="font-black text-slate-800">Último simulacro</p>
+                <p className="mt-1 text-slate-600">{simulacro?.detalle || "Esperando la primera medición"}</p>
+                {simulacro?.fin ? <p className="mt-1 font-semibold text-slate-500">{simulacro.fin}</p> : null}
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2">
+            <a href="https://drive.google.com/drive/folders/1V8zd8z85B4XlFr9uQqBCzUWEEPXuG6Gq"
+              target="_blank" rel="noreferrer"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-3 text-sm font-black text-white">
+              <FolderOpen size={17} /> Respaldos de nómina <ExternalLink size={15} />
+            </a>
+            <a href="https://drive.google.com/drive/folders/1velct65gOyO4qo2EnYh5o6IdwehZUuxz"
+              target="_blank" rel="noreferrer"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700">
+              <FolderOpen size={17} /> Todos los archivos <ExternalLink size={15} />
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div className="ic-panel overflow-hidden rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm md:p-7">
+        <div className="flex items-start gap-3">
+          <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${fuentesPendientes.length ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
+            {fuentesPendientes.length ? <AlertTriangle size={20} /> : <CheckCircle2 size={20} />}
+          </span>
+          <div>
+            <p className="text-xs font-black uppercase tracking-[.16em] text-blue-700">Entradas vigiladas</p>
+            <h2 className="mt-1 text-xl font-black text-slate-950">Alertas de archivos</h2>
+            <p className="mt-1 text-sm text-slate-500">Qué reporte falta, desde cuándo y cuándo debió renovarse.</p>
+          </div>
+        </div>
+        {fuentesPendientes.length ? (
+          <div className="mt-5 grid gap-3 md:grid-cols-2">
+            {fuentesPendientes.map((source) => {
+              const guide = INPUT_GUIDES[source.id];
+              return (
+                <div key={source.id} className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-black text-slate-950">{source.nombre}</h3>
+                      <p className="mt-1 text-xs font-semibold text-slate-600">{guide?.cadence || "Frecuencia configurada"}</p>
+                    </div>
+                    <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-amber-800">{source.estado.replaceAll("_", " ")}</span>
+                  </div>
+                  <p className="mt-3 text-sm text-slate-700">
+                    {source.ultima
+                      ? `Último archivo: ${source.ultima}. Han pasado ${source.dias ?? "—"} días; el límite es ${source.maxDias}.`
+                      : "Todavía no hay una fecha individual confiable para esta fuente."}
+                  </p>
+                  {guide ? <p className="mt-2 text-xs font-semibold text-slate-600">Responsable: {guide.owner} · {guide.origin}</p> : null}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-black text-emerald-800">Todos los archivos vigilados están al día.</p>
+        )}
       </div>
     </section>
   );

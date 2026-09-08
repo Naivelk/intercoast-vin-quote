@@ -1358,26 +1358,26 @@ export default function AdminPanel() {
 
       <div className="flex min-w-0 flex-1 flex-col">
       <header className="admin-header ic-barra sticky top-0 z-40 backdrop-blur-xl">
-        <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-4 md:px-7">
+        <div className="admin-header-row flex flex-wrap items-center justify-between gap-4 px-4 py-4 md:px-7">
           <div className="min-w-0">
             <h1 className="ic-titulo truncate text-xl font-black tracking-[-.02em]">
               {cabecera.titulo}
             </h1>
             <p className="ic-apagado truncate text-[11.5px]">{cabecera.bajada}</p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="admin-header-actions flex flex-wrap gap-2">
             <button
               onClick={() => setSearchOpen(true)}
               className="admin-header-button inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold"
               title="Búsqueda global (Ctrl + K)"
             >
-              <Search size={16} /> Buscar <kbd className="hidden rounded bg-slate-100 px-1.5 py-0.5 text-[10px] sm:inline">Ctrl K</kbd>
+              <Search size={16} /> <span className="ic-action-label">Buscar</span> <kbd className="hidden rounded bg-slate-100 px-1.5 py-0.5 text-[10px] sm:inline">Ctrl K</kbd>
             </button>
             <button
               onClick={() => setEvaOpen(true)}
               className="inline-flex items-center gap-2 rounded-xl bg-blue-50 px-3 py-2 text-sm font-black text-blue-700"
             >
-              <Sparkles size={16} /> Preguntar a Eva
+              <Sparkles size={16} /> <span className="ic-action-label">Preguntar a Eva</span>
             </button>
             <button
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
@@ -1391,17 +1391,21 @@ export default function AdminPanel() {
               href={SHEET}
               target="_blank"
               rel="noreferrer"
-              className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold"
+              aria-label="Abrir Google Sheets"
+              title="Abrir Google Sheets"
             >
-              Hoja de cálculo ↗
+              <FileSpreadsheet size={16} /> <span className="ic-action-label">Hoja de cálculo ↗</span>
             </a>
             <button
               onClick={() => {
                 void Promise.all([load(), loadRetention()]);
               }}
               className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold"
+              aria-label="Actualizar datos"
+              title="Actualizar datos"
             >
-              Actualizar
+              <span className="ic-action-label">Actualizar</span><span className="sm:hidden">↻</span>
             </button>
             <button
               onClick={async () => {
@@ -1409,8 +1413,10 @@ export default function AdminPanel() {
                 window.location.href = "/";
               }}
               className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white"
+              aria-label="Cerrar sesión"
+              title="Cerrar sesión"
             >
-              Salir
+              <span className="ic-action-label">Salir</span><span className="sm:hidden">↗</span>
             </button>
           </div>
         </div>
@@ -1420,11 +1426,12 @@ export default function AdminPanel() {
             Mismos destinos y mismo orden — no es otro menú. */}
         <nav
           aria-label="Secciones del panel"
-          className="mb-5 flex gap-1.5 overflow-x-auto lg:hidden"
+          className="admin-mobile-nav mb-5 flex gap-1.5 overflow-x-auto lg:hidden"
         >
           <button
             onClick={() => setView("hoy")}
-            className={`whitespace-nowrap rounded-xl px-3.5 py-2 text-sm font-bold transition ${view === "hoy" ? "bg-[#0057d9] text-white" : "ic-apagado bg-white/70"}`}
+            aria-current={view === "hoy" ? "page" : undefined}
+            className={`snap-start whitespace-nowrap rounded-xl px-3.5 py-2 text-sm font-bold transition ${view === "hoy" ? "bg-[#0057d9] text-white" : "ic-apagado bg-white/70"}`}
           >
             Hoy
           </button>
@@ -1434,7 +1441,8 @@ export default function AdminPanel() {
               onClick={() => setView(item.id)}
               onMouseEnter={() => precargarVista(item.id)}
               onFocus={() => precargarVista(item.id)}
-              className={`whitespace-nowrap rounded-xl px-3.5 py-2 text-sm font-bold transition ${view === item.id ? "bg-[#0057d9] text-white" : "ic-apagado bg-white/70"}`}
+              aria-current={view === item.id ? "page" : undefined}
+              className={`snap-start whitespace-nowrap rounded-xl px-3.5 py-2 text-sm font-bold transition ${view === item.id ? "bg-[#0057d9] text-white" : "ic-apagado bg-white/70"}`}
             >
               {item.label}
             </button>
