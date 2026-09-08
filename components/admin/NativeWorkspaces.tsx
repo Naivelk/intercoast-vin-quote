@@ -1986,6 +1986,7 @@ type PendingItem = {
 type PendingFollowUp = {
   revisado: boolean;
   nota: string;
+  responsable?: string;
   actualizado: string;
 };
 
@@ -2763,6 +2764,9 @@ export function PendingCenter({
                 ? "Todo lo que requiere atención"
                 : filtros.find((item) => item.id === filtro)?.label}
             </h3>
+            <p className="mt-1 text-[11px] text-slate-500">
+              Revisión, responsable y nota se guardan en este navegador; no cambian el bot ni los libros.
+            </p>
           </div>
           {!loading && (
             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700">
@@ -2788,7 +2792,9 @@ export function PendingCenter({
                     {item.detalle}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-semibold text-slate-500">
-                    <span>Responsable: {item.responsable}</span>
+                    <span>
+                      Responsable: {seguimientos[huellaPendiente(item)]?.responsable || item.responsable}
+                    </span>
                     {item.fecha && (
                       <span>Referencia: {fechaHumana(String(item.fecha).slice(0, 10))}</span>
                     )}
@@ -2822,6 +2828,20 @@ export function PendingCenter({
                     >
                       {seguimientos[huellaPendiente(item)]?.nota ? "Editar nota" : "Añadir nota"}
                     </button>
+                    <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600">
+                      Asignar
+                      <select
+                        value={seguimientos[huellaPendiente(item)]?.responsable || item.responsable}
+                        onChange={(event) =>
+                          actualizarSeguimiento(item, { responsable: event.target.value })
+                        }
+                        className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-bold text-slate-700"
+                      >
+                        {["Alejandro", "Karla", "Kevin", "Oficina"].map((responsable) => (
+                          <option key={responsable}>{responsable}</option>
+                        ))}
+                      </select>
+                    </label>
                   </div>
                   {notaAbierta === huellaPendiente(item) && (
                     <textarea
