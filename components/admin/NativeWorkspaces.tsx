@@ -2615,7 +2615,12 @@ export function PendingCenter({
       : resumen.items.filter((item) => item.categoria === filtro);
   const diasDelMes = fechasHastaHoy(rango.desde, rango.hasta);
   const diasMedidos = new Set(operacion?.diasConDato || []);
-  const diasParciales = new Set(operacion?.parciales || []);
+  const diasParciales = new Set(
+    [
+      ...(operacion?.parciales || []),
+      ...(operacion?.oficinas || []).flatMap((oficina) => oficina.diasParciales || []),
+    ].map((fecha) => String(fecha).slice(0, 10)),
+  );
   const zelleSinAsignarPorDia = (zelle?.pagos || []).reduce<Record<string, number>>(
     (porDia, pago) => {
       const sinDueno =
