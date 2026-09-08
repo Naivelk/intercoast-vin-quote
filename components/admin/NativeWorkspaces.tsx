@@ -1837,10 +1837,18 @@ export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }
   /* `problemas` mezcla fallos actuales, órdenes fallidas, fuentes viejas y
    * avisos de capacidad. Presentarlo entero como «procesos dañados» hacía que
    * el inicio dijera 2 aunque las 12 tarjetas estuvieran verdes. */
-  const procesosConFalla = control?.ok
+  const componentesConFalla = control?.ok
     ? (control.componentes || []).filter((component) =>
-        ["ERROR", "AVISO", "CONGELADO", "ATRASADO"].includes(component.estado),
-      ).length + (control.ordenes?.errores || 0)
+        ["ERROR", "CONGELADO", "ATRASADO"].includes(component.estado),
+      )
+    : null;
+  const componentesConAviso = control?.ok
+    ? (control.componentes || []).filter(
+        (component) => component.estado === "AVISO",
+      )
+    : null;
+  const procesosConFalla = componentesConFalla
+    ? componentesConFalla.length + (control?.ordenes?.errores || 0)
     : null;
   const avisosCapacidad = control?.ok
     ? (control.componentes || []).filter((component) =>
@@ -1865,14 +1873,22 @@ export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }
   const atenciones = [
     procesosConFalla
       ? {
-          id: "procesos",
+          id: "fallas-tecnicas",
           nivel: "Urgente",
-          titulo: `${procesosConFalla} ${procesosConFalla === 1 ? "proceso necesita" : "procesos necesitan"} revisión`,
-          detalle: "Abre Control del bot para ver la causa antes de intervenir.",
+          titulo: `${procesosConFalla} ${procesosConFalla === 1 ? "falla técnica necesita" : "fallas técnicas necesitan"} revisión`,
+          detalle: "El proceso no terminó correctamente o quedó atrasado. Abre Control antes de intervenir.",
           destino: "control",
           tono: "rose",
         }
       : null,
+    ...(componentesConAviso || []).map((component) => ({
+      id: `resultado-${component.id}`,
+      nivel: "Resultado",
+      titulo: `${component.nombre} encontró algo para revisar`,
+      detalle: component.detalle || "La ejecución terminó; revisa el resultado, no el funcionamiento del bot.",
+      destino: "control",
+      tono: "amber" as const,
+    })),
     avisosCapacidad
       ? {
           id: "capacidad",
@@ -2031,9 +2047,15 @@ export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }
           tone="violet"
         />
         <Metric
-          label="Procesos con falla"
+          label="Fallas técnicas"
           value={procesosConFalla === null ? "—" : procesosConFalla}
-          hint={procesosConFalla === null ? "no se pudo leer el control" : procesosConFalla ? "requieren revisión" : "12 procesos funcionando"}
+          hint={procesosConFalla === null
+            ? "no se pudo leer el control"
+            : procesosConFalla
+              ? "requieren revisión"
+              : componentesConAviso?.length
+                ? `${componentesConAviso.length} ${componentesConAviso.length === 1 ? "resultado" : "resultados"} para revisar`
+                : `${control?.componentes?.length || 0} procesos sin fallas`}
           tone={procesosConFalla ? "amber" : "green"}
         />
         <Metric
