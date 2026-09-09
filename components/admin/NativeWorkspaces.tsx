@@ -2045,6 +2045,22 @@ function fechasHastaHoy(desde: string, hasta: string) {
   return fechas;
 }
 
+function hoyLosAngeles() {
+  const partes = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const valor = (tipo: string) => partes.find((parte) => parte.type === tipo)?.value || "";
+  return `${valor("year")}-${valor("month")}-${valor("day")}`;
+}
+
+function sumarDiaISO(fecha: string, dias: number) {
+  return new Date(Date.parse(`${fecha}T12:00:00Z`) + dias * 86400000)
+    .toISOString().slice(0, 10);
+}
+
 /**
  * Una sola clasificación para Inicio y para el Centro de pendientes.
  *
@@ -2576,6 +2592,9 @@ export function PendingCenter({
   const [loading, setLoading] = useState(true);
   const [consultasFallidas, setConsultasFallidas] = useState<string[]>([]);
   const [filtro, setFiltro] = useState<"todos" | PendingCategory>("todos");
+  const [filtroSeguimiento, setFiltroSeguimiento] = useState<
+    "activos" | "esperando" | "pausados" | "cerrados" | "todos"
+  >("activos");
   const [seguimientos, setSeguimientos] = useState<PendingFollowUps>({});
   const [notaAbierta, setNotaAbierta] = useState("");
   const [diaSeleccionado, setDiaSeleccionado] = useState("");
@@ -2745,16 +2764,36 @@ export function PendingCenter({
   }, [rango.desde, rango.hasta]);
 
   const resumen = construirPendientes(control, zelle, operacion, cuadreHealth);
+  const hoyLA = hoyLosAngeles();
+  const grupoSeguimiento = (item: PendingItem) => {
+    const seguimiento = seguimientos[item.id];
+    const estado = seguimiento?.estado || (seguimiento?.revisado ? "RESUELTO" : "PENDIENTE");
+    if (estado === "RESUELTO" || estado === "DATO_CORRECTO") return "cerrados" as const;
+    if (estado === "ESPERANDO_KARLA" || estado === "ESPERANDO_AGENTE") return "esperando" as const;
+    if (estado === "REVISAR_MANANA" && seguimiento?.revisarDespues && seguimiento.revisarDespues > hoyLA)
+      return "pausados" as const;
+    return "activos" as const;
+  };
+  const conteosSeguimiento = resumen.items.reduce<Record<"activos" | "esperando" | "pausados" | "cerrados", number>>(
+    (salida, item) => {
+      salida[grupoSeguimiento(item)]++;
+      return salida;
+    },
+    { activos: 0, esperando: 0, pausados: 0, cerrados: 0 },
+  );
+  const porSeguimiento = filtroSeguimiento === "todos"
+    ? resumen.items
+    : resumen.items.filter((item) => grupoSeguimiento(item) === filtroSeguimiento);
   const conteos: Record<PendingCategory, number> = {
-    informacion: resumen.items.filter((item) => item.categoria === "informacion").length,
-    revision: resumen.items.filter((item) => item.categoria === "revision").length,
-    falla: resumen.items.filter((item) => item.categoria === "falla").length,
-    vigilar: resumen.items.filter((item) => item.categoria === "vigilar").length,
+    informacion: porSeguimiento.filter((item) => item.categoria === "informacion").length,
+    revision: porSeguimiento.filter((item) => item.categoria === "revision").length,
+    falla: porSeguimiento.filter((item) => item.categoria === "falla").length,
+    vigilar: porSeguimiento.filter((item) => item.categoria === "vigilar").length,
   };
   const visibles =
     filtro === "todos"
-      ? resumen.items
-      : resumen.items.filter((item) => item.categoria === filtro);
+      ? porSeguimiento
+      : porSeguimiento.filter((item) => item.categoria === filtro);
   const diasDelMes = fechasHastaHoy(rango.desde, rango.hasta);
   const diasMedidos = new Set(operacion?.diasConDato || []);
   const diasParciales = new Set(
@@ -2917,7 +2956,7 @@ export function PendingCenter({
     count: number;
     tone: string;
   }> = [
-    { id: "todos", label: "Todos", count: resumen.items.length, tone: "text-slate-900" },
+    { id: "todos", label: "Todos", count: porSeguimiento.length, tone: "text-slate-900" },
     { id: "falla", label: "Fallas", count: conteos.falla, tone: "text-rose-700" },
     { id: "revision", label: "Revisión", count: conteos.revision, tone: "text-amber-700" },
     { id: "informacion", label: "Información", count: conteos.informacion, tone: "text-blue-700" },
@@ -2928,6 +2967,13 @@ export function PendingCenter({
     amber: "border-amber-200 bg-amber-50 text-amber-800",
     blue: "border-blue-200 bg-blue-50 text-blue-800",
   };
+  const filtrosSeguimiento = [
+    { id: "activos" as const, label: "Activos", count: conteosSeguimiento.activos },
+    { id: "esperando" as const, label: "Esperando", count: conteosSeguimiento.esperando },
+    { id: "pausados" as const, label: "Revisar después", count: conteosSeguimiento.pausados },
+    { id: "cerrados" as const, label: "Cerrados", count: conteosSeguimiento.cerrados },
+    { id: "todos" as const, label: "Historial completo", count: resumen.items.length },
+  ];
 
   return (
     <div className="flex flex-col gap-5">
@@ -2966,6 +3012,26 @@ export function PendingCenter({
           </p>
         </div>
       )}
+
+      <section className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="px-2 text-[10px] font-black uppercase tracking-wider text-slate-500">Seguimiento</span>
+          {filtrosSeguimiento.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setFiltroSeguimiento(item.id)}
+              aria-pressed={filtroSeguimiento === item.id}
+              className={`rounded-xl px-3 py-2 text-xs font-black transition ${filtroSeguimiento === item.id ? "bg-blue-700 text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`}
+            >
+              {item.label} · {loading ? "—" : item.count}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 px-2 text-[11px] text-slate-500">
+          Resueltos y datos confirmados salen de Activos. “Revisar mañana” reaparece automáticamente cuando llega su fecha.
+        </p>
+      </section>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {filtros.map((item) => (
@@ -3059,7 +3125,7 @@ export function PendingCenter({
                             estado,
                             revisado: estado === "RESUELTO" || estado === "DATO_CORRECTO",
                             revisarDespues: estado === "REVISAR_MANANA"
-                              ? new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+                              ? sumarDiaISO(hoyLA, 1)
                               : "",
                           });
                         }}
@@ -3105,8 +3171,10 @@ export function PendingCenter({
                     </p>
                   )}
                   {seguimientos[item.id]?.estado === "REVISAR_MANANA" && seguimientos[item.id]?.revisarDespues && (
-                    <p className="mt-2 text-[11px] font-black text-violet-700">
-                      Programado para revisar el {fechaHumana(seguimientos[item.id]?.revisarDespues || "")}.
+                    <p className={`mt-2 text-[11px] font-black ${String(seguimientos[item.id]?.revisarDespues) <= hoyLA ? "text-amber-700" : "text-violet-700"}`}>
+                      {String(seguimientos[item.id]?.revisarDespues) <= hoyLA
+                        ? "Toca revisarlo hoy."
+                        : `Programado para revisar el ${fechaHumana(seguimientos[item.id]?.revisarDespues || "")}.`}
                     </p>
                   )}
                   {notaAbierta === item.id && (
