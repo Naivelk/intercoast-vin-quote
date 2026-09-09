@@ -2056,6 +2056,15 @@ type ShadowReconciliation = {
   error?: string;
 };
 
+function valorConciliacion(caso: ShadowReconciliationCase, valor: number | null, diferencia = false) {
+  if (valor === null) return diferencia ? "Por confirmar" : "Sin dato";
+  if (caso.motivo === "TARJETA_CANTIDAD_DIFIERE") {
+    const prefijo = diferencia && valor > 0 ? "+" : "";
+    return `${prefijo}${valor} tarjeta${Math.abs(valor) === 1 ? "" : "s"}`;
+  }
+  return moneyExact(valor);
+}
+
 function huellaPendiente(item: PendingItem) {
   return `${item.id}|${String(item.fecha || "").slice(0, 10)}|${item.detalle}`;
 }
@@ -2713,6 +2722,7 @@ export function PendingCenter({
   const [conciliacionLoading, setConciliacionLoading] = useState(true);
   const [vistaConciliacion, setVistaConciliacion] = useState<"activos" | "resueltos">("activos");
   const [filtroConciliacion, setFiltroConciliacion] = useState("todos");
+  const [origenConciliacion, setOrigenConciliacion] = useState("todos");
   const [resumenCopiado, setResumenCopiado] = useState(false);
   const [cierreMensual, setCierreMensual] = useState<MonthlyClose | null>(null);
   const [historialCierres, setHistorialCierres] = useState<MonthlyClose[]>([]);
@@ -3040,8 +3050,13 @@ export function PendingCenter({
     ...(conciliacionSombra?.activos || []).map((caso) => caso.tipo),
     ...(conciliacionSombra?.resueltos || []).map((caso) => caso.tipo),
   ])).sort();
+  const origenesConciliacion = Array.from(new Set([
+    ...(conciliacionSombra?.activos || []).map((caso) => caso.origen),
+    ...(conciliacionSombra?.resueltos || []).map((caso) => caso.origen),
+  ])).sort();
   const casosConciliacion = casosConciliacionBase.filter((caso) =>
-    filtroConciliacion === "todos" || caso.tipo === filtroConciliacion,
+    (filtroConciliacion === "todos" || caso.tipo === filtroConciliacion) &&
+    (origenConciliacion === "todos" || caso.origen === origenConciliacion),
   );
   const diasCuadre = [...new Set(alertasCuadre.map((alerta) => alerta.fecha))].sort();
   const oficinasCuadre = [...new Set(alertasCuadre.map((alerta) => alerta.oficina))].sort();
@@ -3294,6 +3309,9 @@ export function PendingCenter({
             <span className="mx-1 h-6 w-px bg-slate-200" />
             <button type="button" onClick={() => setFiltroConciliacion("todos")} className={`rounded-lg px-2.5 py-1.5 text-[10px] font-black ${filtroConciliacion === "todos" ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600"}`}>Todos</button>
             {tiposConciliacion.map((tipo) => <button key={tipo} type="button" onClick={() => setFiltroConciliacion(tipo)} className={`rounded-lg px-2.5 py-1.5 text-[10px] font-black ${filtroConciliacion === tipo ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600"}`}>{tipo}</button>)}
+            <span className="mx-1 h-6 w-px bg-slate-200" />
+            <button type="button" onClick={() => setOrigenConciliacion("todos")} className={`rounded-lg px-2.5 py-1.5 text-[10px] font-black ${origenConciliacion === "todos" ? "bg-cyan-700 text-white" : "bg-cyan-50 text-cyan-800"}`}>Todas las fuentes</button>
+            {origenesConciliacion.map((origen) => <button key={origen} type="button" onClick={() => setOrigenConciliacion(origen)} className={`rounded-lg px-2.5 py-1.5 text-[10px] font-black ${origenConciliacion === origen ? "bg-cyan-700 text-white" : "bg-cyan-50 text-cyan-800"}`}>{origen}</button>)}
           </div>
           {conciliacionLoading ? (
             <p className="mt-4 rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-600">Leyendo expedientes de conciliación…</p>
@@ -3315,9 +3333,9 @@ export function PendingCenter({
                   </div>
                   {(caso.declarado !== null || caso.sentry !== null || caso.diferencia !== null) && (
                     <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                      <div className="rounded-xl bg-white px-3 py-2"><p className="text-[9px] font-black uppercase text-slate-400">Declarado/Zelle</p><p className="text-sm font-black text-slate-900">{caso.declarado === null ? "Sin dato" : moneyExact(caso.declarado)}</p></div>
-                      <div className="rounded-xl bg-white px-3 py-2"><p className="text-[9px] font-black uppercase text-slate-400">Sentry</p><p className="text-sm font-black text-slate-900">{caso.sentry === null ? "Sin respaldo" : moneyExact(caso.sentry)}</p></div>
-                      <div className="rounded-xl bg-white px-3 py-2"><p className="text-[9px] font-black uppercase text-slate-400">Diferencia</p><p className="text-sm font-black text-rose-700">{caso.diferencia === null ? "Por confirmar" : moneyExact(caso.diferencia)}</p></div>
+                      <div className="rounded-xl bg-white px-3 py-2"><p className="text-[9px] font-black uppercase text-slate-400">{caso.origen === "TARJETAS" ? "En Deposit Log" : "Declarado/Zelle"}</p><p className="text-sm font-black text-slate-900">{valorConciliacion(caso, caso.declarado)}</p></div>
+                      <div className="rounded-xl bg-white px-3 py-2"><p className="text-[9px] font-black uppercase text-slate-400">{caso.origen === "TARJETAS" ? "Valor esperado" : "Sentry"}</p><p className="text-sm font-black text-slate-900">{caso.sentry === null ? "Sin respaldo" : valorConciliacion(caso, caso.sentry)}</p></div>
+                      <div className="rounded-xl bg-white px-3 py-2"><p className="text-[9px] font-black uppercase text-slate-400">Diferencia</p><p className="text-sm font-black text-rose-700">{valorConciliacion(caso, caso.diferencia, true)}</p></div>
                     </div>
                   )}
                   <p className="mt-3 text-xs font-semibold leading-relaxed text-slate-700">{caso.explicacion}</p>
