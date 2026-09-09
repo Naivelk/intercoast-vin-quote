@@ -2029,6 +2029,33 @@ type MonthlyClose = {
   cambios?: string[];
 };
 
+type ShadowReconciliationCase = {
+  id: string;
+  estado: string;
+  tipo: "DINERO" | "ASIGNACION" | "FUENTE" | "ESTRUCTURA" | string;
+  origen: string;
+  fecha: string;
+  oficina: string;
+  agente: string;
+  declarado: number | null;
+  sentry: number | null;
+  diferencia: number | null;
+  motivo: string;
+  explicacion: string;
+  accion: string;
+  detectado: string;
+  actualizado: string;
+};
+
+type ShadowReconciliation = {
+  ok: boolean;
+  actualizado: string;
+  activos: ShadowReconciliationCase[];
+  resueltos: ShadowReconciliationCase[];
+  resumen: Record<string, number>;
+  error?: string;
+};
+
 function huellaPendiente(item: PendingItem) {
   return `${item.id}|${String(item.fecha || "").slice(0, 10)}|${item.detalle}`;
 }
@@ -2682,6 +2709,10 @@ export function PendingCenter({
   const [filtroMotivoCuadre, setFiltroMotivoCuadre] = useState("todos");
   const [filtroClaseCuadre, setFiltroClaseCuadre] = useState<"todos" | "problema" | "proteccion">("todos");
   const [ventanaReincidencias, setVentanaReincidencias] = useState<7 | 30>(30);
+  const [conciliacionSombra, setConciliacionSombra] = useState<ShadowReconciliation | null>(null);
+  const [conciliacionLoading, setConciliacionLoading] = useState(true);
+  const [vistaConciliacion, setVistaConciliacion] = useState<"activos" | "resueltos">("activos");
+  const [filtroConciliacion, setFiltroConciliacion] = useState("todos");
   const [resumenCopiado, setResumenCopiado] = useState(false);
   const [cierreMensual, setCierreMensual] = useState<MonthlyClose | null>(null);
   const [historialCierres, setHistorialCierres] = useState<MonthlyClose[]>([]);
@@ -2976,6 +3007,19 @@ export function PendingCenter({
     });
     return () => { vigente = false; };
   }, [loading, cuadreLoading, control, operacion, cuadreHealth, mesCierre, huellaCierreMensual]);
+  useEffect(() => {
+    if (loading) return;
+    let vigente = true;
+    setConciliacionLoading(true);
+    void callTool<ShadowReconciliation>("consola", "conciliacionSombra", [], true)
+      .then((value) => { if (vigente) setConciliacionSombra(value); })
+      .catch(() => {
+        if (vigente) setConciliacionSombra({ ok: false, actualizado: "", activos: [],
+          resueltos: [], resumen: {}, error: "No se pudo leer el modo sombra." });
+      })
+      .finally(() => { if (vigente) setConciliacionLoading(false); });
+    return () => { vigente = false; };
+  }, [loading]);
   const mesesHistorialCierre = Array.from(new Set(historialCierres.map((item) => item.mes)));
   const mesHistorialActivo = mesHistorialCierre || mesCierre;
   const historialCierreFiltrado = historialCierres.filter((item) => item.mes === mesHistorialActivo);
@@ -2989,6 +3033,15 @@ export function PendingCenter({
   const alertasCuadre = cuadreHealth?.alertas || [];
   const reincidenciasCuadre = detectarReincidenciasCuadre(
     alertasCuadre, hoyLA, ventanaReincidencias,
+  );
+  const casosConciliacionBase = vistaConciliacion === "activos"
+    ? conciliacionSombra?.activos || [] : conciliacionSombra?.resueltos || [];
+  const tiposConciliacion = Array.from(new Set([
+    ...(conciliacionSombra?.activos || []).map((caso) => caso.tipo),
+    ...(conciliacionSombra?.resueltos || []).map((caso) => caso.tipo),
+  ])).sort();
+  const casosConciliacion = casosConciliacionBase.filter((caso) =>
+    filtroConciliacion === "todos" || caso.tipo === filtroConciliacion,
   );
   const diasCuadre = [...new Set(alertasCuadre.map((alerta) => alerta.fecha))].sort();
   const oficinasCuadre = [...new Set(alertasCuadre.map((alerta) => alerta.oficina))].sort();
@@ -3214,6 +3267,70 @@ export function PendingCenter({
             </p>
           </button>
         ))}
+      </section>
+
+      <section className="overflow-hidden rounded-2xl border border-blue-200 bg-white shadow-sm">
+        <div className="bg-gradient-to-r from-slate-950 to-blue-950 px-5 py-5 text-white">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-cyan-300/15 px-2.5 py-1 text-[9px] font-black uppercase tracking-[.16em] text-cyan-200">Modo sombra</span>
+                <span className="text-[10px] font-bold text-blue-200">Solo lectura</span>
+              </div>
+              <h3 className="mt-2 text-xl font-black">Conciliación financiera</h3>
+              <p className="mt-1 max-w-2xl text-xs leading-relaxed text-blue-100">Cruza Sentry, Zelle y el cuadre con el motor canónico. Cada discrepancia conserva identidad e historial; desaparecer de la ventana no la cierra.</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-center">
+              <div className="rounded-xl bg-white/10 px-4 py-2"><p className="text-2xl font-black tabular-nums">{conciliacionLoading ? "—" : conciliacionSombra?.activos.length || 0}</p><p className="text-[9px] font-black uppercase tracking-wide text-blue-200">abiertos</p></div>
+              <div className="rounded-xl bg-white/10 px-4 py-2"><p className="text-2xl font-black tabular-nums">{conciliacionLoading ? "—" : conciliacionSombra?.resueltos.length || 0}</p><p className="text-[9px] font-black uppercase tracking-wide text-blue-200">resueltos</p></div>
+            </div>
+          </div>
+        </div>
+        <div className="p-5">
+          <div className="flex flex-wrap items-center gap-2">
+            {(["activos", "resueltos"] as const).map((vista) => (
+              <button key={vista} type="button" onClick={() => setVistaConciliacion(vista)} aria-pressed={vistaConciliacion === vista} className={`rounded-xl px-3 py-2 text-xs font-black ${vistaConciliacion === vista ? "bg-blue-700 text-white" : "bg-slate-100 text-slate-600"}`}>{vista === "activos" ? "Casos abiertos" : "Resueltos solos"}</button>
+            ))}
+            <span className="mx-1 h-6 w-px bg-slate-200" />
+            <button type="button" onClick={() => setFiltroConciliacion("todos")} className={`rounded-lg px-2.5 py-1.5 text-[10px] font-black ${filtroConciliacion === "todos" ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600"}`}>Todos</button>
+            {tiposConciliacion.map((tipo) => <button key={tipo} type="button" onClick={() => setFiltroConciliacion(tipo)} className={`rounded-lg px-2.5 py-1.5 text-[10px] font-black ${filtroConciliacion === tipo ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600"}`}>{tipo}</button>)}
+          </div>
+          {conciliacionLoading ? (
+            <p className="mt-4 rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-600">Leyendo expedientes de conciliación…</p>
+          ) : !conciliacionSombra?.ok ? (
+            <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">{conciliacionSombra?.error || "La conciliación sombra todavía no está disponible."}</p>
+          ) : casosConciliacion.length ? (
+            <div className="mt-4 space-y-3">
+              {casosConciliacion.map((caso) => (
+                <article key={caso.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-wide ${caso.estado === "ABIERTO" ? "bg-rose-100 text-rose-800" : "bg-emerald-100 text-emerald-800"}`}>{caso.estado === "ABIERTO" ? "Abierto" : "Resuelto automáticamente"}</span>
+                        <span className="text-[10px] font-black text-blue-700">{caso.tipo} · {caso.origen}</span>
+                      </div>
+                      <h4 className="mt-2 text-sm font-black text-slate-950">{fechaHumana(caso.fecha)} · {caso.oficina}{caso.agente ? ` · ${caso.agente}` : ""}</h4>
+                    </div>
+                    <span className="font-mono text-[9px] text-slate-400">{caso.id}</span>
+                  </div>
+                  {(caso.declarado !== null || caso.sentry !== null || caso.diferencia !== null) && (
+                    <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                      <div className="rounded-xl bg-white px-3 py-2"><p className="text-[9px] font-black uppercase text-slate-400">Declarado/Zelle</p><p className="text-sm font-black text-slate-900">{caso.declarado === null ? "Sin dato" : moneyExact(caso.declarado)}</p></div>
+                      <div className="rounded-xl bg-white px-3 py-2"><p className="text-[9px] font-black uppercase text-slate-400">Sentry</p><p className="text-sm font-black text-slate-900">{caso.sentry === null ? "Sin respaldo" : moneyExact(caso.sentry)}</p></div>
+                      <div className="rounded-xl bg-white px-3 py-2"><p className="text-[9px] font-black uppercase text-slate-400">Diferencia</p><p className="text-sm font-black text-rose-700">{caso.diferencia === null ? "Por confirmar" : moneyExact(caso.diferencia)}</p></div>
+                    </div>
+                  )}
+                  <p className="mt-3 text-xs font-semibold leading-relaxed text-slate-700">{caso.explicacion}</p>
+                  <p className="mt-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-900"><span className="font-black">Siguiente paso:</span> {caso.accion}</p>
+                  <p className="mt-2 text-[10px] text-slate-500">Detectado {caso.detectado}{caso.actualizado && caso.actualizado !== caso.detectado ? ` · actualizado ${caso.actualizado}` : ""}</p>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">No hay expedientes en esta vista. Esto solo afirma lo que el motor alcanzó a medir.</p>
+          )}
+          <p className="mt-4 border-t border-slate-100 pt-3 text-[10px] text-slate-500">El modo sombra no corrige ni ejecuta comandos. Un caso solo se resuelve cuando su misma fecha vuelve a estar cubierta por las fuentes y la discrepancia deja de reproducirse.</p>
+        </div>
       </section>
 
       <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
