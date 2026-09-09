@@ -39,6 +39,22 @@ export default async (request) => {
     const output = await response.text();
     if (/^\s*</.test(output)) throw new Error("Google devolvió una página.");
     const data = JSON.parse(output);
+    if (!data.ok && data.codigo === "SIN_MEDICION") {
+      const refreshResponse = await fetch(target, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ action: "panelCuadreHealthRefresh", token }),
+        signal: AbortSignal.timeout(8000),
+      });
+      const refreshText = await refreshResponse.text();
+      const refresh = /^\s*</.test(refreshText) ? null : JSON.parse(refreshText);
+      if (!refresh?.ok) throw new Error("No se pudo iniciar la medición del cuadre.");
+      return json(202, {
+        ok: false,
+        pending: true,
+        error: "Preparando la primera medición; vuelve a actualizar en un minuto.",
+      });
+    }
     if (!data.ok) throw new Error(data.error || "El cuadre no respondió.");
     memory.set("cuadre", { data, savedAt: Date.now() });
     return json(200, { ...data, cached: false });

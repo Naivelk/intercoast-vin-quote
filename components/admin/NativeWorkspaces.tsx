@@ -378,6 +378,7 @@ type CuadreHealthData = {
   resumen: Record<string, number>;
   cached?: boolean;
   stale?: boolean;
+  pending?: boolean;
   error?: string;
 };
 
@@ -2569,6 +2570,7 @@ export function PendingCenter({
   const [notaAbierta, setNotaAbierta] = useState("");
   const [diaSeleccionado, setDiaSeleccionado] = useState("");
   const [resumenCopiado, setResumenCopiado] = useState(false);
+  const reintentoCuadre = useRef<number | null>(null);
 
   const loadSeguimientos = async (items: PendingItem[]) => {
     try {
@@ -2636,6 +2638,18 @@ export function PendingCenter({
         response,
         "No se pudo medir el cuadre.",
       );
+      if (!value.ok && value.pending) {
+        setConsultasFallidas((actuales) =>
+          actuales.filter((nombre) => nombre !== "Salud del cuadre"),
+        );
+        if (reintentoCuadre.current === null) {
+          reintentoCuadre.current = window.setTimeout(() => {
+            reintentoCuadre.current = null;
+            void loadCuadreHealth(true);
+          }, 65000);
+        }
+        return null;
+      }
       if (!value.ok) throw new Error(value.error || "No se pudo medir el cuadre.");
       setCuadreHealth(value);
       setConsultasFallidas((actuales) =>
@@ -2711,6 +2725,9 @@ export function PendingCenter({
 
   useEffect(() => {
     void load();
+    return () => {
+      if (reintentoCuadre.current !== null) window.clearTimeout(reintentoCuadre.current);
+    };
   }, [rango.desde, rango.hasta]);
 
   const resumen = construirPendientes(control, zelle, operacion, cuadreHealth);
