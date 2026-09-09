@@ -2246,7 +2246,7 @@ export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }
   }, []);
 
   useEffect(() => {
-    void fetch("/api/admin/cuadre-health", { credentials: "include" })
+    void fetch("/api/admin/cuadre-health", { credentials: "include", cache: "no-store" })
       .then((response) => leerJsonSeguro<CuadreHealthData>(response, "No se pudo medir el cuadre."))
       .then((value) => setCuadreHealth(value.ok ? value : null))
       .catch(() => undefined);
@@ -2632,7 +2632,7 @@ export function PendingCenter({
     try {
       const response = await fetch(
         `/api/admin/cuadre-health${force ? "?force=1" : ""}`,
-        { credentials: "include" },
+        { credentials: "include", cache: "no-store" },
       );
       const value = await leerJsonSeguro<CuadreHealthData>(
         response,

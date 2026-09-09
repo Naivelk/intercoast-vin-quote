@@ -4,11 +4,11 @@ const ALLOWED_EMAILS = new Set([
   "intercoast.texto@gmail.com",
   "alequito09@hotmail.com",
 ]);
-const json = (status, body) => new Response(JSON.stringify(body), {
+const json = (status, body, cacheControl = "private, max-age=300, stale-while-revalidate=900") => new Response(JSON.stringify(body), {
   status,
   headers: {
     "Content-Type": "application/json; charset=utf-8",
-    "Cache-Control": "private, max-age=300, stale-while-revalidate=900",
+    "Cache-Control": cacheControl,
   },
 });
 const memory = globalThis.__intercoastCuadreHealthCache || new Map();
@@ -53,7 +53,7 @@ export default async (request) => {
         ok: false,
         pending: true,
         error: "Preparando la primera medición; vuelve a actualizar en un minuto.",
-      });
+      }, "no-store");
     }
     if (!data.ok) throw new Error(data.error || "El cuadre no respondió.");
     memory.set("cuadre", { data, savedAt: Date.now() });
