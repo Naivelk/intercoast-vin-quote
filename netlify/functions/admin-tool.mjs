@@ -116,6 +116,7 @@ export default async (request) => {
           "seguimientoPendientes",
           "guardarSeguimientoPendiente",
           "cierresMensuales",
+          "historialCierresMensuales",
           "guardarCierreMensual",
         ]),
         zelle: new Set(["datos", "actualizar"]),

@@ -2026,6 +2026,7 @@ type MonthlyClose = {
   actualizado: string;
   usuario?: string;
   reabierto?: boolean;
+  cambios?: string[];
 };
 
 function huellaPendiente(item: PendingItem) {
@@ -2612,6 +2613,9 @@ export function PendingCenter({
   const [filtroClaseCuadre, setFiltroClaseCuadre] = useState<"todos" | "problema" | "proteccion">("todos");
   const [resumenCopiado, setResumenCopiado] = useState(false);
   const [cierreMensual, setCierreMensual] = useState<MonthlyClose | null>(null);
+  const [historialCierres, setHistorialCierres] = useState<MonthlyClose[]>([]);
+  const [historialCierresVisible, setHistorialCierresVisible] = useState(false);
+  const [mesHistorialCierre, setMesHistorialCierre] = useState("");
   const [cierreGuardando, setCierreGuardando] = useState(false);
   const [cierreError, setCierreError] = useState("");
   const reintentoCuadre = useRef<number | null>(null);
@@ -2861,6 +2865,15 @@ export function PendingCenter({
   );
   const fuentesNoListas = (control?.fuentes || []).filter((source) => source.estado !== "OK");
   const mesCierre = rango.desde.slice(0, 7);
+  const evidenciaCierreMensual = {
+    hasta: diasDelMes[diasDelMes.length - 1] || rango.desde,
+    dias: { total: cierres.length, cerrados, revisar: aRevisar, sinMedir },
+    fuentes: { total: (control?.fuentes || []).length, pendientes: fuentesNoListas.length },
+    guardas: cierres.reduce((total, dia) => total +
+      dia.alertasCuadre.reduce((suma, alerta) => suma + alerta.casos, 0), 0),
+    zelle: cierres.reduce((total, dia) => total + dia.zellePendiente, 0),
+    tarjetas: control?.componentes?.find((item) => item.id === "tarjetas")?.estado || "SIN_MEDIR",
+  };
   const huellaCierreMensual = JSON.stringify({
     mes: mesCierre,
     dias: cierres.map((dia) => [dia.fecha, dia.estado, dia.zellePendiente,
@@ -2874,16 +2887,27 @@ export function PendingCenter({
   useEffect(() => {
     if (loading || cuadreLoading || !control || !operacion || !cuadreHealth) return;
     let vigente = true;
-    void callTool<{ ok: boolean; cierres: MonthlyClose[] }>(
-      "consola", "cierresMensuales",
-      [[{ mes: mesCierre, huella: huellaCierreMensual }]], true,
-    ).then((value) => {
-      if (vigente) setCierreMensual(value.cierres?.[0] || null);
+    void Promise.all([
+      callTool<{ ok: boolean; cierres: MonthlyClose[] }>(
+        "consola", "cierresMensuales",
+        [[{ mes: mesCierre, huella: huellaCierreMensual, evidencia: evidenciaCierreMensual }]], true,
+      ),
+      callTool<{ ok: boolean; historial: MonthlyClose[] }>(
+        "consola", "historialCierresMensuales", [60], true,
+      ),
+    ]).then(([cierresValue, historialValue]) => {
+      if (vigente) {
+        setCierreMensual(cierresValue.cierres?.[0] || null);
+        setHistorialCierres(historialValue.historial || []);
+      }
     }).catch(() => {
       if (vigente) setCierreError("No se pudo leer la certificación compartida.");
     });
     return () => { vigente = false; };
   }, [loading, cuadreLoading, control, operacion, cuadreHealth, mesCierre, huellaCierreMensual]);
+  const mesesHistorialCierre = Array.from(new Set(historialCierres.map((item) => item.mes)));
+  const mesHistorialActivo = mesHistorialCierre || mesCierre;
+  const historialCierreFiltrado = historialCierres.filter((item) => item.mes === mesHistorialActivo);
   const etiquetaGuarda = (motivo: string) => ({
     MAS_QUE_SENTRY: "Lo declarado supera lo respaldado por Sentry",
     RECLAMADO_SIN_COBROS: "Hay un reclamo sin cobros respaldados",
@@ -2936,10 +2960,15 @@ export function PendingCenter({
       const value = await callTool<{ ok: boolean; cierre: MonthlyClose }>(
         "consola", "guardarCierreMensual",
         [mesCierre, huellaCierreMensual, estado,
-          estado === "CERTIFICADO" ? "Corte revisado desde el panel." : "Corte reabierto desde el panel."],
+          estado === "CERTIFICADO" ? "Corte revisado desde el panel." : "Corte reabierto desde el panel.",
+          "", evidenciaCierreMensual],
         true,
       );
       setCierreMensual(value.cierre);
+      const historialValue = await callTool<{ ok: boolean; historial: MonthlyClose[] }>(
+        "consola", "historialCierresMensuales", [60], true,
+      );
+      setHistorialCierres(historialValue.historial || []);
     } catch {
       setCierreError("No se pudo guardar el corte. No se modificó ningún libro.");
     } finally {
@@ -3352,6 +3381,7 @@ export function PendingCenter({
                   : `Todavía no está listo: ${sinMedir} día(s) sin medir, ${aRevisar} por revisar y ${fuentesNoListas.length} fuente(s) pendientes.`}
             </p>
             {cierreMensual?.reabierto && <p className="mt-2 text-xs font-black text-amber-700">Reabierto automáticamente porque cambió la evidencia después de la certificación.</p>}
+            {!!cierreMensual?.cambios?.length && <p className="mt-1 text-xs font-semibold text-amber-700">Cambió: {cierreMensual.cambios.join(" · ")}</p>}
             {cierreMensual?.actualizado && <p className="mt-2 text-[11px] font-semibold text-slate-500">Último cambio: {cierreMensual.actualizado}{cierreMensual.usuario ? ` · ${cierreMensual.usuario}` : ""}</p>}
             {cierreError && <p className="mt-2 text-xs font-black text-rose-700">{cierreError}</p>}
           </div>
@@ -3361,7 +3391,34 @@ export function PendingCenter({
             <button type="button" onClick={() => void cambiarCierreMensual("CERTIFICADO")} disabled={!corteListo || cierreGuardando} className="rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-40">{cierreGuardando ? "Guardando…" : "Certificar corte"}</button>
           )}
         </div>
-        <p className="mt-4 border-t border-slate-200/80 pt-3 text-[11px] text-slate-500">La certificación guarda solo mes, huella, estado, autor y fecha. No bloquea ni escribe los libros.</p>
+        <p className="mt-4 border-t border-slate-200/80 pt-3 text-[11px] text-slate-500">La certificación guarda mes, huella, estado, autor, fecha y conteos agregados. Nunca guarda nombres ni montos; no bloquea ni escribe los libros.</p>
+        <div className="mt-3 border-t border-slate-200/80 pt-3">
+          <button type="button" onClick={() => setHistorialCierresVisible((visible) => !visible)} className="text-xs font-black text-blue-700">
+            {historialCierresVisible ? "Ocultar historial" : `Ver historial${historialCierres.length ? ` (${historialCierres.length})` : ""}`}
+          </button>
+          {historialCierresVisible && (
+            <div className="mt-3 space-y-3">
+              {!!mesesHistorialCierre.length && (
+                <select value={mesHistorialActivo} onChange={(event) => setMesHistorialCierre(event.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">
+                  {mesesHistorialCierre.map((mes) => <option key={mes} value={mes}>{mes}</option>)}
+                </select>
+              )}
+              {!historialCierreFiltrado.length ? (
+                <p className="text-xs text-slate-500">Todavía no hay certificaciones guardadas para este mes.</p>
+              ) : historialCierreFiltrado.map((item, index) => (
+                <div key={`${item.actualizado}-${index}`} className="rounded-xl border border-slate-200 bg-white/80 px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className={`text-[10px] font-black uppercase tracking-wide ${item.estado === "CERTIFICADO" ? "text-emerald-700" : "text-amber-700"}`}>{item.estado === "CERTIFICADO" ? "Certificado" : "Reabierto"}</span>
+                    <span className="text-[11px] font-semibold text-slate-500">{item.actualizado}</span>
+                  </div>
+                  <p className="mt-1 text-xs font-semibold text-slate-700">{item.nota || "Cambio registrado desde el panel."}</p>
+                  {item.usuario && <p className="mt-1 text-[11px] text-slate-500">{item.usuario}</p>}
+                  {!!item.cambios?.length && <p className="mt-1 text-[11px] font-bold text-blue-700">Cambió: {item.cambios.join(" · ")}</p>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </section>
 
       <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
