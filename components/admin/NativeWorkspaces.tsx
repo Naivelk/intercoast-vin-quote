@@ -2012,7 +2012,14 @@ function huellaPendiente(item: PendingItem) {
 }
 
 function fechasHastaHoy(desde: string, hasta: string) {
-  const limite = new Date().toISOString().slice(0, 10);
+  const partes = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const valor = (tipo: string) => partes.find((parte) => parte.type === tipo)?.value || "";
+  const limite = `${valor("year")}-${valor("month")}-${valor("day")}`;
   const fin = hasta < limite ? hasta : limite;
   const fechas: string[] = [];
   for (
