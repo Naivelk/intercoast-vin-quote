@@ -115,6 +115,8 @@ export default async (request) => {
           "operacionPorOficina",
           "seguimientoPendientes",
           "guardarSeguimientoPendiente",
+          "cierresMensuales",
+          "guardarCierreMensual",
         ]),
         zelle: new Set(["datos", "actualizar"]),
       };
@@ -126,6 +128,9 @@ export default async (request) => {
       const args = Array.isArray(body.args) ? [...body.args] : [];
       if (tool === "consola" && action === "guardarSeguimientoPendiente") {
         args[5] = email;
+      }
+      if (tool === "consola" && action === "guardarCierreMensual") {
+        args[4] = email;
       }
       const cacheKey = `${tool}:${action}:${JSON.stringify(args)}`;
       const ttl = CACHE_TTL[`${tool}:${action}`] || 0;

@@ -2019,6 +2019,14 @@ type PendingFollowUp = {
 };
 
 type PendingFollowUps = Record<string, PendingFollowUp>;
+type MonthlyClose = {
+  mes: string;
+  estado: "ABIERTO" | "CERTIFICADO";
+  nota: string;
+  actualizado: string;
+  usuario?: string;
+  reabierto?: boolean;
+};
 
 function huellaPendiente(item: PendingItem) {
   return `${item.id}|${String(item.fecha || "").slice(0, 10)}|${item.detalle}`;
@@ -2603,6 +2611,9 @@ export function PendingCenter({
   const [filtroMotivoCuadre, setFiltroMotivoCuadre] = useState("todos");
   const [filtroClaseCuadre, setFiltroClaseCuadre] = useState<"todos" | "problema" | "proteccion">("todos");
   const [resumenCopiado, setResumenCopiado] = useState(false);
+  const [cierreMensual, setCierreMensual] = useState<MonthlyClose | null>(null);
+  const [cierreGuardando, setCierreGuardando] = useState(false);
+  const [cierreError, setCierreError] = useState("");
   const reintentoCuadre = useRef<number | null>(null);
 
   const loadSeguimientos = async (items: PendingItem[]) => {
@@ -2848,6 +2859,31 @@ export function PendingCenter({
       typeof source.dias === "number" &&
       source.maxDias - source.dias <= 2,
   );
+  const fuentesNoListas = (control?.fuentes || []).filter((source) => source.estado !== "OK");
+  const mesCierre = rango.desde.slice(0, 7);
+  const huellaCierreMensual = JSON.stringify({
+    mes: mesCierre,
+    dias: cierres.map((dia) => [dia.fecha, dia.estado, dia.zellePendiente,
+      dia.alertasCuadre.reduce((suma, alerta) => suma + alerta.casos, 0)]),
+    fuentes: (control?.fuentes || []).map((source) => [source.id, source.estado, source.ultima || ""]),
+    tarjetas: control?.componentes?.find((item) => item.id === "tarjetas")?.estado || "SIN_MEDIR",
+  });
+  const corteListo = !loading && !cuadreLoading && consultasFallidas.length === 0 &&
+    cierres.length > 0 && sinMedir === 0 && aRevisar === 0 && fuentesNoListas.length === 0;
+
+  useEffect(() => {
+    if (loading || cuadreLoading || !control || !operacion || !cuadreHealth) return;
+    let vigente = true;
+    void callTool<{ ok: boolean; cierres: MonthlyClose[] }>(
+      "consola", "cierresMensuales",
+      [[{ mes: mesCierre, huella: huellaCierreMensual }]], true,
+    ).then((value) => {
+      if (vigente) setCierreMensual(value.cierres?.[0] || null);
+    }).catch(() => {
+      if (vigente) setCierreError("No se pudo leer la certificación compartida.");
+    });
+    return () => { vigente = false; };
+  }, [loading, cuadreLoading, control, operacion, cuadreHealth, mesCierre, huellaCierreMensual]);
   const etiquetaGuarda = (motivo: string) => ({
     MAS_QUE_SENTRY: "Lo declarado supera lo respaldado por Sentry",
     RECLAMADO_SIN_COBROS: "Hay un reclamo sin cobros respaldados",
@@ -2892,6 +2928,23 @@ export function PendingCenter({
     await navigator.clipboard.writeText(texto);
     setResumenCopiado(true);
     window.setTimeout(() => setResumenCopiado(false), 2500);
+  };
+  const cambiarCierreMensual = async (estado: MonthlyClose["estado"]) => {
+    setCierreGuardando(true);
+    setCierreError("");
+    try {
+      const value = await callTool<{ ok: boolean; cierre: MonthlyClose }>(
+        "consola", "guardarCierreMensual",
+        [mesCierre, huellaCierreMensual, estado,
+          estado === "CERTIFICADO" ? "Corte revisado desde el panel." : "Corte reabierto desde el panel."],
+        true,
+      );
+      setCierreMensual(value.cierre);
+    } catch {
+      setCierreError("No se pudo guardar el corte. No se modificó ningún libro.");
+    } finally {
+      setCierreGuardando(false);
+    }
   };
 
   const actualizarSeguimiento = (
@@ -3284,6 +3337,31 @@ export function PendingCenter({
             </ul>
           </div>
         )}
+      </section>
+
+      <section className={`rounded-2xl border p-5 shadow-sm ${cierreMensual?.estado === "CERTIFICADO" ? "border-emerald-200 bg-emerald-50" : "border-slate-100 bg-white"}`}>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-2xl">
+            <p className="text-[10px] font-black uppercase tracking-[.12em] text-blue-700">Corte certificado</p>
+            <h3 className="mt-1 text-lg font-black text-slate-950">{mesCierre} · control hasta hoy</h3>
+            <p className="mt-1 text-xs leading-relaxed text-slate-600">
+              {cierreMensual?.estado === "CERTIFICADO"
+                ? "El manager confirmó esta evidencia. Si cambia un día, una fuente o una guarda, el corte se reabre automáticamente."
+                : corteListo
+                  ? "Todos los días medidos hasta hoy están cerrados y las fuentes están al día. Ya se puede certificar este corte."
+                  : `Todavía no está listo: ${sinMedir} día(s) sin medir, ${aRevisar} por revisar y ${fuentesNoListas.length} fuente(s) pendientes.`}
+            </p>
+            {cierreMensual?.reabierto && <p className="mt-2 text-xs font-black text-amber-700">Reabierto automáticamente porque cambió la evidencia después de la certificación.</p>}
+            {cierreMensual?.actualizado && <p className="mt-2 text-[11px] font-semibold text-slate-500">Último cambio: {cierreMensual.actualizado}{cierreMensual.usuario ? ` · ${cierreMensual.usuario}` : ""}</p>}
+            {cierreError && <p className="mt-2 text-xs font-black text-rose-700">{cierreError}</p>}
+          </div>
+          {cierreMensual?.estado === "CERTIFICADO" ? (
+            <button type="button" onClick={() => void cambiarCierreMensual("ABIERTO")} disabled={cierreGuardando} className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-black text-slate-700 disabled:opacity-50">Reabrir corte</button>
+          ) : (
+            <button type="button" onClick={() => void cambiarCierreMensual("CERTIFICADO")} disabled={!corteListo || cierreGuardando} className="rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-40">{cierreGuardando ? "Guardando…" : "Certificar corte"}</button>
+          )}
+        </div>
+        <p className="mt-4 border-t border-slate-200/80 pt-3 text-[11px] text-slate-500">La certificación guarda solo mes, huella, estado, autor y fecha. No bloquea ni escribe los libros.</p>
       </section>
 
       <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
