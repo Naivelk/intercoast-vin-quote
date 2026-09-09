@@ -2070,6 +2070,76 @@ function sumarDiaISO(fecha: string, dias: number) {
     .toISOString().slice(0, 10);
 }
 
+type RecurrenciaCuadre = {
+  oficina: string;
+  motivo: string;
+  dias: number;
+  casos: number;
+  primera: string;
+  ultima: string;
+  tendencia: "NUEVO" | "EMPEORA" | "MEJORA" | "ESTABLE";
+};
+
+function detectarReincidenciasCuadre(
+  alertas: CuadreHealthData["alertas"],
+  hoy: string,
+  ventana: 7 | 30,
+): RecurrenciaCuadre[] {
+  const desde = sumarDiaISO(hoy, 1 - ventana);
+  const mitad = Math.ceil(ventana / 2);
+  const desdeReciente = sumarDiaISO(hoy, 1 - mitad);
+  const grupos = new Map<string, {
+    oficina: string;
+    motivo: string;
+    fechas: Set<string>;
+    casos: number;
+    anteriores: number;
+    recientes: number;
+  }>();
+  alertas.forEach((alerta) => {
+    if (alerta.fecha < desde || alerta.fecha > hoy || alerta.motivo === "TECLEADO_A_MANO") return;
+    const llave = `${alerta.oficina}|${alerta.motivo}`;
+    const grupo = grupos.get(llave) || {
+      oficina: alerta.oficina,
+      motivo: alerta.motivo,
+      fechas: new Set<string>(),
+      casos: 0,
+      anteriores: 0,
+      recientes: 0,
+    };
+    const casos = Math.max(0, Number(alerta.casos) || 0);
+    grupo.fechas.add(alerta.fecha);
+    grupo.casos += casos;
+    if (alerta.fecha >= desdeReciente) grupo.recientes += casos;
+    else grupo.anteriores += casos;
+    grupos.set(llave, grupo);
+  });
+  return Array.from(grupos.values())
+    .filter((grupo) => grupo.fechas.size >= 2)
+    .map((grupo) => {
+      const fechas = Array.from(grupo.fechas).sort();
+      const comparacion = grupo.recientes * (ventana - mitad) - grupo.anteriores * mitad;
+      const tendencia: RecurrenciaCuadre["tendencia"] = grupo.anteriores === 0
+        ? "NUEVO"
+        : comparacion > 0
+          ? "EMPEORA"
+          : comparacion < 0
+            ? "MEJORA"
+            : "ESTABLE";
+      return {
+        oficina: grupo.oficina,
+        motivo: grupo.motivo,
+        dias: fechas.length,
+        casos: grupo.casos,
+        primera: fechas[0],
+        ultima: fechas[fechas.length - 1],
+        tendencia,
+      };
+    })
+    .sort((a, b) => b.dias - a.dias || b.casos - a.casos ||
+      a.oficina.localeCompare(b.oficina));
+}
+
 /**
  * Una sola clasificación para Inicio y para el Centro de pendientes.
  *
@@ -2611,6 +2681,7 @@ export function PendingCenter({
   const [filtroOficinaCuadre, setFiltroOficinaCuadre] = useState("todas");
   const [filtroMotivoCuadre, setFiltroMotivoCuadre] = useState("todos");
   const [filtroClaseCuadre, setFiltroClaseCuadre] = useState<"todos" | "problema" | "proteccion">("todos");
+  const [ventanaReincidencias, setVentanaReincidencias] = useState<7 | 30>(30);
   const [resumenCopiado, setResumenCopiado] = useState(false);
   const [cierreMensual, setCierreMensual] = useState<MonthlyClose | null>(null);
   const [historialCierres, setHistorialCierres] = useState<MonthlyClose[]>([]);
@@ -2916,6 +2987,9 @@ export function PendingCenter({
   })[motivo] || motivo.replaceAll("_", " ").toLowerCase();
   const esProteccionCuadre = (motivo: string) => motivo === "TECLEADO_A_MANO";
   const alertasCuadre = cuadreHealth?.alertas || [];
+  const reincidenciasCuadre = detectarReincidenciasCuadre(
+    alertasCuadre, hoyLA, ventanaReincidencias,
+  );
   const diasCuadre = [...new Set(alertasCuadre.map((alerta) => alerta.fecha))].sort();
   const oficinasCuadre = [...new Set(alertasCuadre.map((alerta) => alerta.oficina))].sort();
   const motivosCuadre = [...new Set(alertasCuadre.map((alerta) => alerta.motivo))].sort();
@@ -2926,6 +3000,14 @@ export function PendingCenter({
     (filtroClaseCuadre === "todos" ||
       (filtroClaseCuadre === "proteccion") === esProteccionCuadre(alerta.motivo)),
   );
+  const abrirReincidenciaCuadre = (item: RecurrenciaCuadre) => {
+    setFiltroDiaCuadre("todos");
+    setFiltroOficinaCuadre(item.oficina);
+    setFiltroMotivoCuadre(item.motivo);
+    setFiltroClaseCuadre("problema");
+    window.setTimeout(() => document.getElementById("detalle-cuadre")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  };
   const cierreSeleccionado = cierres.find((dia) => dia.fecha === diaSeleccionado);
   const ultimosSiete = cierres.slice(-7);
   const copiarResumenSemanal = async () => {
@@ -3421,7 +3503,51 @@ export function PendingCenter({
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+      <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[.12em] text-blue-700">Problemas repetidos</p>
+            <h3 className="mt-1 text-lg font-black text-slate-950">Patrones que conviene corregir de raíz</h3>
+            <p className="mt-1 max-w-2xl text-xs text-slate-500">Agrupa una misma oficina y motivo cuando aparece en dos o más días. Compara el ritmo de casos entre las dos mitades del periodo; no usa nombres ni montos.</p>
+          </div>
+          <div className="flex rounded-xl bg-slate-100 p-1">
+            {([7, 30] as const).map((dias) => (
+              <button key={dias} type="button" onClick={() => setVentanaReincidencias(dias)} aria-pressed={ventanaReincidencias === dias} className={`rounded-lg px-3 py-1.5 text-xs font-black ${ventanaReincidencias === dias ? "bg-white text-blue-700 shadow-sm" : "text-slate-500"}`}>{dias} días</button>
+            ))}
+          </div>
+        </div>
+        {cuadreLoading ? (
+          <p className="mt-4 rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-600">Analizando el historial disponible…</p>
+        ) : !cuadreHealth?.ok ? (
+          <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">No hay una medición suficiente para afirmar si existen patrones repetidos.</p>
+        ) : reincidenciasCuadre.length ? (
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {reincidenciasCuadre.map((item) => {
+              const tendencia = {
+                NUEVO: { texto: "Apareció recientemente", clase: "bg-blue-100 text-blue-800" },
+                EMPEORA: { texto: "Va en aumento", clase: "bg-rose-100 text-rose-800" },
+                MEJORA: { texto: "Va disminuyendo", clase: "bg-emerald-100 text-emerald-800" },
+                ESTABLE: { texto: "Se mantiene", clase: "bg-amber-100 text-amber-800" },
+              }[item.tendencia];
+              return (
+                <button key={`${item.oficina}-${item.motivo}`} type="button" onClick={() => abrirReincidenciaCuadre(item)} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-blue-300 hover:bg-blue-50/50">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-black text-slate-950">{item.oficina}</span>
+                    <span className={`rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-wide ${tendencia.clase}`}>{tendencia.texto}</span>
+                  </div>
+                  <p className="mt-2 text-xs font-semibold leading-relaxed text-slate-600">{etiquetaGuarda(item.motivo)}</p>
+                  <p className="mt-3 text-sm font-black text-slate-950">{item.dias} días · {item.casos} {item.casos === 1 ? "caso" : "casos"}</p>
+                  <p className="mt-1 text-[10px] text-slate-500">{fechaHumana(item.primera)} → {fechaHumana(item.ultima)} · abrir detalle</p>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">No hay un mismo problema repetido en dos días dentro de esta ventana.</p>
+        )}
+      </section>
+
+      <section id="detalle-cuadre" className="scroll-mt-6 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-5 py-4">
           <p className="text-[10px] font-black uppercase tracking-[.12em] text-blue-700">Detalle del cuadre</p>
           <h3 className="mt-1 text-lg font-black text-slate-950">Guardas por día, oficina y motivo</h3>
