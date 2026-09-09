@@ -366,6 +366,21 @@ type DriveHealthData = {
   error?: string;
 };
 
+type CuadreHealthData = {
+  ok: boolean;
+  actualizado: string;
+  alertas: Array<{
+    fecha: string;
+    oficina: string;
+    motivo: string;
+    casos: number;
+  }>;
+  resumen: Record<string, number>;
+  cached?: boolean;
+  stale?: boolean;
+  error?: string;
+};
+
 const INPUT_GUIDES: Record<
   string,
   {
@@ -1988,24 +2003,11 @@ type PendingFollowUp = {
   nota: string;
   responsable?: string;
   actualizado: string;
+  usuario?: string;
+  reabierto?: boolean;
 };
 
 type PendingFollowUps = Record<string, PendingFollowUp>;
-
-const PENDING_FOLLOW_UP_KEY = "intercoast-pending-follow-up-v1";
-
-function leerSeguimientosPendientes(): PendingFollowUps {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(PENDING_FOLLOW_UP_KEY) || "{}");
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function guardarSeguimientosPendientes(value: PendingFollowUps) {
-  localStorage.setItem(PENDING_FOLLOW_UP_KEY, JSON.stringify(value));
-}
 
 function huellaPendiente(item: PendingItem) {
   return `${item.id}|${String(item.fecha || "").slice(0, 10)}|${item.detalle}`;
@@ -2043,6 +2045,7 @@ function construirPendientes(
   control: ControlData | null,
   zelle: ZelleData | null,
   operacion: OfficeOperationData | null,
+  cuadreHealth: CuadreHealthData | null = null,
 ) {
   const componentesConFalla = control?.ok
     ? (control.componentes || []).filter((component) =>
@@ -2078,6 +2081,10 @@ function construirPendientes(
   );
   const faltan = operacion?.diasSinDato || [];
   const medidos = operacion?.diasConDato?.length || 0;
+  const guardasCuadre = (cuadreHealth?.alertas || []).reduce(
+    (suma, alerta) => suma + Number(alerta.casos || 0),
+    0,
+  );
 
   const items = [
     procesosConFalla
@@ -2152,6 +2159,21 @@ function construirPendientes(
           fecha: zellesSinAsignar.map((payment) => payment.fecha).filter(Boolean).sort()[0],
         }
       : null,
+    guardasCuadre
+      ? {
+          id: "guardas-cuadre",
+          categoria: "revision",
+          nivel: "Requiere revisión",
+          titulo: `${guardasCuadre} ${guardasCuadre === 1 ? "caso del cuadre necesita" : "casos del cuadre necesitan"} revisión`,
+          detalle: Object.entries(cuadreHealth?.resumen || {})
+            .map(([motivo, cantidad]) => `${motivo.replaceAll("_", " ")}: ${cantidad}`)
+            .join(" · "),
+          destino: "operacion",
+          tono: "amber",
+          responsable: "Alejandro",
+          fecha: (cuadreHealth?.alertas || []).map((alerta) => alerta.fecha).sort()[0],
+        }
+      : null,
     faltan.length
       ? {
           id: "cobertura",
@@ -2183,6 +2205,7 @@ export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }
   const [asistencia, setAsistencia] = useState<AttendanceData | null>(null);
   const [control, setControl] = useState<ControlData | null>(null);
   const [zelle, setZelle] = useState<ZelleData | null>(() => readCache("zelle"));
+  const [cuadreHealth, setCuadreHealth] = useState<CuadreHealthData | null>(null);
   const [loading, setLoading] = useState(true);
 
   const rango = useMemo(() => mesEnCurso(new Date()), []);
@@ -2221,13 +2244,20 @@ export function TodayHome({ onNavigate }: { onNavigate: (view: string) => void }
       .catch(() => undefined);
   }, []);
 
+  useEffect(() => {
+    void fetch("/api/admin/cuadre-health", { credentials: "include" })
+      .then((response) => leerJsonSeguro<CuadreHealthData>(response, "No se pudo medir el cuadre."))
+      .then((value) => setCuadreHealth(value.ok ? value : null))
+      .catch(() => undefined);
+  }, []);
+
   const oficinas = operacion?.oficinas || [];
   const faltan = operacion?.diasSinDato || [];
   const medidos = operacion?.diasConDato?.length || 0;
   const cobertura = operacion?.cobertura || null;
   const trabajando = asistencia?.resumen?.trabajando ?? null;
   const agentes = asistencia?.agentes?.length ?? null;
-  const resumenPendientes = construirPendientes(control, zelle, operacion);
+  const resumenPendientes = construirPendientes(control, zelle, operacion, cuadreHealth);
   const { componentesConAviso, procesosConFalla, fuentesPorRevisar } =
     resumenPendientes;
   const atenciones = resumenPendientes.items;
@@ -2529,14 +2559,44 @@ export function PendingCenter({
   const [operacion, setOperacion] = useState<OfficeOperationData | null>(null);
   const [zelle, setZelle] = useState<ZelleData | null>(() => readCache("zelle"));
   const [driveHealth, setDriveHealth] = useState<DriveHealthData | null>(null);
+  const [cuadreHealth, setCuadreHealth] = useState<CuadreHealthData | null>(null);
   const [driveLoading, setDriveLoading] = useState(true);
+  const [cuadreLoading, setCuadreLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [consultasFallidas, setConsultasFallidas] = useState<string[]>([]);
   const [filtro, setFiltro] = useState<"todos" | PendingCategory>("todos");
-  const [seguimientos, setSeguimientos] = useState<PendingFollowUps>(() =>
-    leerSeguimientosPendientes(),
-  );
+  const [seguimientos, setSeguimientos] = useState<PendingFollowUps>({});
   const [notaAbierta, setNotaAbierta] = useState("");
+  const [diaSeleccionado, setDiaSeleccionado] = useState("");
+  const [resumenCopiado, setResumenCopiado] = useState(false);
+
+  const loadSeguimientos = async (items: PendingItem[]) => {
+    try {
+      const value = await callTool<{
+        ok: boolean;
+        seguimientos: Array<PendingFollowUp & { id: string }>;
+      }>("consola", "seguimientoPendientes", [
+        items.map((item) => ({ id: item.id, huella: huellaPendiente(item) })),
+      ], true);
+      const porId = (value.seguimientos || []).reduce<PendingFollowUps>(
+        (salida, seguimiento) => {
+          salida[seguimiento.id] = seguimiento;
+          return salida;
+        },
+        {},
+      );
+      setSeguimientos(porId);
+      setConsultasFallidas((actuales) =>
+        actuales.filter((nombre) => nombre !== "Seguimiento compartido"),
+      );
+    } catch {
+      setConsultasFallidas((actuales) =>
+        actuales.includes("Seguimiento compartido")
+          ? actuales
+          : [...actuales, "Seguimiento compartido"],
+      );
+    }
+  };
 
   const loadDriveHealth = async (force = false) => {
     setDriveLoading(true);
@@ -2565,9 +2625,40 @@ export function PendingCenter({
     }
   };
 
+  const loadCuadreHealth = async (force = false) => {
+    setCuadreLoading(true);
+    try {
+      const response = await fetch(
+        `/api/admin/cuadre-health${force ? "?force=1" : ""}`,
+        { credentials: "include" },
+      );
+      const value = await leerJsonSeguro<CuadreHealthData>(
+        response,
+        "No se pudo medir el cuadre.",
+      );
+      if (!value.ok) throw new Error(value.error || "No se pudo medir el cuadre.");
+      setCuadreHealth(value);
+      setConsultasFallidas((actuales) =>
+        actuales.filter((nombre) => nombre !== "Salud del cuadre"),
+      );
+      return value;
+    } catch {
+      setCuadreHealth(null);
+      setConsultasFallidas((actuales) =>
+        actuales.includes("Salud del cuadre")
+          ? actuales
+          : [...actuales, "Salud del cuadre"],
+      );
+      return null;
+    } finally {
+      setCuadreLoading(false);
+    }
+  };
+
   const load = async (force = false) => {
     setLoading(true);
     void loadDriveHealth(force);
+    const cuadrePromesa = loadCuadreHealth(force);
     const resultados = await Promise.allSettled([
       callTool<ControlData>("consola", "centroControl", [], force),
       callTool<OfficeOperationData>(
@@ -2580,29 +2671,41 @@ export function PendingCenter({
     ]);
     const fallidas: string[] = [];
     const [ctl, ope, zel] = resultados;
-    if (ctl.status === "fulfilled" && ctl.value?.ok) setControl(ctl.value);
+    const controlNuevo = ctl.status === "fulfilled" && ctl.value?.ok ? ctl.value : null;
+    const operacionNueva = ope.status === "fulfilled" && ope.value?.ok ? ope.value : null;
+    const zelleNuevo = zel.status === "fulfilled" ? zel.value : null;
+    if (controlNuevo) setControl(controlNuevo);
     else {
       setControl(null);
       fallidas.push("Control del bot");
     }
-    if (ope.status === "fulfilled" && ope.value?.ok) {
-      setOperacion(ope.value);
-      writeCache(claveOperacion(rango.desde, rango.hasta), ope.value);
+    if (operacionNueva) {
+      setOperacion(operacionNueva);
+      writeCache(claveOperacion(rango.desde, rango.hasta), operacionNueva);
     } else {
       setOperacion(null);
       fallidas.push("Operación por oficina");
     }
-    if (zel.status === "fulfilled") {
-      setZelle(zel.value);
-      writeCache("zelle", zel.value);
+    if (zelleNuevo) {
+      setZelle(zelleNuevo);
+      writeCache("zelle", zelleNuevo);
     } else {
       if (!zelle) setZelle(null);
       fallidas.push("Zelle");
     }
     setConsultasFallidas((actuales) => [
       ...fallidas,
-      ...actuales.filter((nombre) => nombre === "Duplicados de Drive"),
+      ...actuales.filter((nombre) =>
+        ["Duplicados de Drive", "Salud del cuadre", "Seguimiento compartido"].includes(nombre),
+      ),
     ]);
+    if (controlNuevo || operacionNueva || zelleNuevo) {
+      void cuadrePromesa.then((cuadreNuevo) =>
+        loadSeguimientos(
+          construirPendientes(controlNuevo, zelleNuevo, operacionNueva, cuadreNuevo).items,
+        ),
+      );
+    }
     setLoading(false);
   };
 
@@ -2610,7 +2713,7 @@ export function PendingCenter({
     void load();
   }, [rango.desde, rango.hasta]);
 
-  const resumen = construirPendientes(control, zelle, operacion);
+  const resumen = construirPendientes(control, zelle, operacion, cuadreHealth);
   const conteos: Record<PendingCategory, number> = {
     informacion: resumen.items.filter((item) => item.categoria === "informacion").length,
     revision: resumen.items.filter((item) => item.categoria === "revision").length,
@@ -2640,16 +2743,23 @@ export function PendingCenter({
     },
     {},
   );
+  const alertasCuadrePorDia = (cuadreHealth?.alertas || []).reduce<
+    Record<string, CuadreHealthData["alertas"]>
+  >((porDia, alerta) => {
+    (porDia[alerta.fecha] ||= []).push(alerta);
+    return porDia;
+  }, {});
   const cierres = diasDelMes.map((fecha) => {
     const medido = diasMedidos.has(fecha);
     const parcial = diasParciales.has(fecha);
     const zellePendiente = zelleSinAsignarPorDia[fecha] || 0;
+    const alertasCuadre = alertasCuadrePorDia[fecha] || [];
     const estado = !medido
       ? "FALTA INFORMACIÓN"
-      : parcial || zellePendiente
+      : parcial || zellePendiente || alertasCuadre.length
         ? "REVISAR"
         : "CERRADO";
-    return { fecha, medido, parcial, zellePendiente, estado };
+    return { fecha, medido, parcial, zellePendiente, alertasCuadre, estado };
   });
   const cerrados = cierres.filter((dia) => dia.estado === "CERRADO").length;
   const aRevisar = cierres.filter((dia) => dia.estado === "REVISAR").length;
@@ -2668,22 +2778,89 @@ export function PendingCenter({
       typeof source.dias === "number" &&
       source.maxDias - source.dias <= 2,
   );
+  const etiquetaGuarda = (motivo: string) => ({
+    MAS_QUE_SENTRY: "Lo declarado supera lo respaldado por Sentry",
+    RECLAMADO_SIN_COBROS: "Hay un reclamo sin cobros respaldados",
+    SIN_DATO_EN_SENTRY: "Falta Daily Report suficiente",
+  })[motivo] || motivo.replaceAll("_", " ").toLowerCase();
+  const cierreSeleccionado = cierres.find((dia) => dia.fecha === diaSeleccionado);
+  const ultimosSiete = cierres.slice(-7);
+  const copiarResumenSemanal = async () => {
+    const conteo = (estado: string) => ultimosSiete.filter((dia) => dia.estado === estado).length;
+    const zellePendientes = ultimosSiete.reduce((suma, dia) => suma + dia.zellePendiente, 0);
+    const guardas = ultimosSiete.reduce(
+      (suma, dia) => suma + dia.alertasCuadre.reduce((subtotal, alerta) => subtotal + alerta.casos, 0),
+      0,
+    );
+    const fuentes = (control?.fuentes || []).filter((source) => source.estado !== "OK").length;
+    const texto = [
+      "CIERRE SEMANAL · INTERCOAST",
+      ultimosSiete.length
+        ? `${ultimosSiete[0].fecha} → ${ultimosSiete[ultimosSiete.length - 1].fecha}`
+        : "Sin días disponibles",
+      `Días cerrados: ${conteo("CERRADO")}`,
+      `Días por revisar: ${conteo("REVISAR")}`,
+      `Días sin medir: ${conteo("FALTA INFORMACIÓN")}`,
+      `Zelle sin dueño: ${zellePendientes}`,
+      `Guardas del cuadre: ${guardas}`,
+      `Tarjetas: ${tarjetas?.estado || "SIN MEDIR"}${tarjetas?.detalle ? ` · ${tarjetas.detalle}` : ""}`,
+      `Fuentes pendientes: ${fuentes}`,
+    ].join("\n");
+    await navigator.clipboard.writeText(texto);
+    setResumenCopiado(true);
+    window.setTimeout(() => setResumenCopiado(false), 2500);
+  };
 
   const actualizarSeguimiento = (
     item: PendingItem,
     patch: Partial<PendingFollowUp>,
+    persistir = true,
   ) => {
-    const key = huellaPendiente(item);
-    const next = {
-      ...seguimientos,
-      [key]: {
-        ...(seguimientos[key] || { revisado: false, nota: "", actualizado: "" }),
-        ...patch,
-        actualizado: new Date().toISOString(),
-      },
+    const actual = seguimientos[item.id] || {
+      revisado: false,
+      nota: "",
+      responsable: item.responsable,
+      actualizado: "",
     };
-    setSeguimientos(next);
-    guardarSeguimientosPendientes(next);
+    const seguimiento = {
+      ...actual,
+      ...patch,
+      actualizado: new Date().toISOString(),
+    };
+    setSeguimientos((anteriores) => ({
+      ...anteriores,
+      [item.id]: seguimiento,
+    }));
+    if (persistir) {
+      void callTool<{ ok: boolean; seguimiento: PendingFollowUp & { id: string } }>(
+        "consola",
+        "guardarSeguimientoPendiente",
+        [
+          item.id,
+          huellaPendiente(item),
+          seguimiento.revisado,
+          seguimiento.nota,
+          seguimiento.responsable || item.responsable,
+        ],
+        true,
+      ).then((value) => {
+        if (value.seguimiento) {
+          setSeguimientos((anteriores) => ({
+            ...anteriores,
+            [item.id]: value.seguimiento,
+          }));
+        }
+        setConsultasFallidas((actuales) =>
+          actuales.filter((nombre) => nombre !== "Seguimiento compartido"),
+        );
+      }).catch(() => {
+        setConsultasFallidas((actuales) =>
+          actuales.includes("Seguimiento compartido")
+            ? actuales
+            : [...actuales, "Seguimiento compartido"],
+        );
+      });
+    }
   };
   const filtros: Array<{
     id: "todos" | PendingCategory;
@@ -2772,7 +2949,7 @@ export function PendingCenter({
                 : filtros.find((item) => item.id === filtro)?.label}
             </h3>
             <p className="mt-1 text-[11px] text-slate-500">
-              Revisión, responsable y nota se guardan en este navegador; no cambian el bot ni los libros.
+              Revisión, responsable y nota se comparten entre los dos managers. Cada cambio conserva autor y fecha; no modifica los libros.
             </p>
           </div>
           {!loading && (
@@ -2800,7 +2977,7 @@ export function PendingCenter({
                   </p>
                   <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-semibold text-slate-500">
                     <span>
-                      Responsable: {seguimientos[huellaPendiente(item)]?.responsable || item.responsable}
+                      Responsable: {seguimientos[item.id]?.responsable || item.responsable}
                     </span>
                     {item.fecha && (
                       <span>Referencia: {fechaHumana(String(item.fecha).slice(0, 10))}</span>
@@ -2811,16 +2988,16 @@ export function PendingCenter({
                       type="button"
                       onClick={() =>
                         actualizarSeguimiento(item, {
-                          revisado: !seguimientos[huellaPendiente(item)]?.revisado,
+                          revisado: !seguimientos[item.id]?.revisado,
                         })
                       }
                       className={`rounded-lg px-3 py-1.5 text-[11px] font-black ${
-                        seguimientos[huellaPendiente(item)]?.revisado
+                        seguimientos[item.id]?.revisado
                           ? "bg-emerald-100 text-emerald-800"
                           : "bg-slate-100 text-slate-700"
                       }`}
                     >
-                      {seguimientos[huellaPendiente(item)]?.revisado
+                      {seguimientos[item.id]?.revisado
                         ? "Revisado ✓"
                         : "Marcar revisado"}
                     </button>
@@ -2828,17 +3005,17 @@ export function PendingCenter({
                       type="button"
                       onClick={() =>
                         setNotaAbierta((actual) =>
-                          actual === huellaPendiente(item) ? "" : huellaPendiente(item),
+                          actual === item.id ? "" : item.id,
                         )
                       }
                       className="rounded-lg bg-blue-50 px-3 py-1.5 text-[11px] font-black text-blue-700"
                     >
-                      {seguimientos[huellaPendiente(item)]?.nota ? "Editar nota" : "Añadir nota"}
+                      {seguimientos[item.id]?.nota ? "Editar nota" : "Añadir nota"}
                     </button>
                     <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600">
                       Asignar
                       <select
-                        value={seguimientos[huellaPendiente(item)]?.responsable || item.responsable}
+                        value={seguimientos[item.id]?.responsable || item.responsable}
                         onChange={(event) =>
                           actualizarSeguimiento(item, { responsable: event.target.value })
                         }
@@ -2850,15 +3027,23 @@ export function PendingCenter({
                       </select>
                     </label>
                   </div>
-                  {notaAbierta === huellaPendiente(item) && (
+                  {seguimientos[item.id]?.reabierto && (
+                    <p className="mt-2 text-[11px] font-black text-amber-700">
+                      Reabierto automáticamente: cambió la evidencia desde la última revisión.
+                    </p>
+                  )}
+                  {notaAbierta === item.id && (
                     <textarea
-                      value={seguimientos[huellaPendiente(item)]?.nota || ""}
+                      value={seguimientos[item.id]?.nota || ""}
                       onChange={(event) =>
-                        actualizarSeguimiento(item, { nota: event.target.value })
+                        actualizarSeguimiento(item, { nota: event.target.value }, false)
+                      }
+                      onBlur={(event) =>
+                        actualizarSeguimiento(item, { nota: event.target.value }, true)
                       }
                       rows={2}
                       maxLength={300}
-                      placeholder="Nota de seguimiento en este navegador…"
+                      placeholder="Nota compartida para los managers…"
                       className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 outline-none focus:border-blue-400"
                     />
                   )}
@@ -2898,13 +3083,13 @@ export function PendingCenter({
             Estado del mes hasta hoy
           </h3>
           <p className="mt-1 text-xs text-slate-500">
-            Usa los días publicados por Operación y los Zelle sin dueño. Un día
-            ausente nunca se presenta como cero.
+            Usa Operación, los Zelle sin dueño y las guardas privadas del cuadre.
+            Un día ausente nunca se presenta como cero. Toca un día para ver el motivo.
           </p>
         </div>
         <div className="grid gap-3 p-5 sm:grid-cols-3">
           <Metric label="Cerrados" value={loading ? "—" : cerrados} hint="medidos, completos y sin Zelle pendiente" tone="green" />
-          <Metric label="Por revisar" value={loading ? "—" : aRevisar} hint="parciales o con Zelle sin dueño" tone="amber" />
+          <Metric label="Por revisar" value={loading || cuadreLoading ? "—" : aRevisar} hint="parciales, Zelle sin dueño o guardas del cuadre" tone="amber" />
           <Metric label="Sin medir" value={loading ? "—" : sinMedir} hint="falta evidencia; no significa cero" tone="violet" />
         </div>
         {!loading && (
@@ -2917,15 +3102,41 @@ export function PendingCenter({
                     ? "border-amber-200 bg-amber-50 text-amber-800"
                     : "border-blue-200 bg-blue-50 text-blue-800";
               return (
-                <div key={dia.fecha} className={`rounded-xl border p-2 text-center ${estilo}`} title={`${dia.fecha} · ${dia.estado}`}>
+                <button
+                  type="button"
+                  key={dia.fecha}
+                  onClick={() => setDiaSeleccionado((actual) => actual === dia.fecha ? "" : dia.fecha)}
+                  aria-pressed={diaSeleccionado === dia.fecha}
+                  className={`rounded-xl border p-2 text-center transition hover:-translate-y-0.5 ${estilo} ${diaSeleccionado === dia.fecha ? "ring-2 ring-blue-400 ring-offset-2" : ""}`}
+                  title={`${dia.fecha} · ${dia.estado}`}
+                >
                   <p className="text-[10px] font-black uppercase">{dia.fecha.slice(8)}</p>
                   <p className="mt-1 text-[9px] font-black leading-tight">
                     {dia.estado === "CERRADO" ? "Cerrado" : dia.estado === "REVISAR" ? "Revisar" : "Sin medir"}
                   </p>
                   {dia.zellePendiente > 0 && <p className="mt-1 text-[9px]">{dia.zellePendiente} Zelle</p>}
-                </div>
+                  {dia.alertasCuadre.length > 0 && <p className="mt-1 text-[9px]">{dia.alertasCuadre.reduce((suma, alerta) => suma + alerta.casos, 0)} cuadre</p>}
+                </button>
               );
             })}
+          </div>
+        )}
+        {!loading && cierreSeleccionado && (
+          <div className="border-t border-slate-100 px-5 py-4">
+            <p className="text-sm font-black text-slate-950">
+              {fechaHumana(cierreSeleccionado.fecha)} · {cierreSeleccionado.estado}
+            </p>
+            <ul className="mt-2 space-y-1 text-xs text-slate-600">
+              {!cierreSeleccionado.medido && <li>• Falta la medición de Operación para ese día.</li>}
+              {cierreSeleccionado.parcial && <li>• Al menos una oficina quedó parcial.</li>}
+              {cierreSeleccionado.zellePendiente > 0 && <li>• {cierreSeleccionado.zellePendiente} Zelle todavía no tiene dueño.</li>}
+              {cierreSeleccionado.alertasCuadre.map((alerta) => (
+                <li key={`${alerta.oficina}-${alerta.motivo}`}>
+                  • {alerta.oficina}: {etiquetaGuarda(alerta.motivo)} ({alerta.casos} {alerta.casos === 1 ? "caso" : "casos"}).
+                </li>
+              ))}
+              {cierreSeleccionado.estado === "CERRADO" && <li>• Tiene medición completa y no presenta pendientes conocidos.</li>}
+            </ul>
           </div>
         )}
       </section>
@@ -2952,6 +3163,13 @@ export function PendingCenter({
         <article className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
           <p className="text-[10px] font-black uppercase tracking-[.12em] text-blue-700">Informe semanal</p>
           <h3 className="mt-1 text-lg font-black text-slate-950">Tarjetas y salud de fuentes</h3>
+          <button
+            type="button"
+            onClick={() => void copiarResumenSemanal()}
+            className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-700 px-3 py-2 text-xs font-black text-white hover:bg-blue-800"
+          >
+            {resumenCopiado ? "Resumen copiado ✓" : "Copiar cierre de los últimos 7 días"}
+          </button>
           <div className={`mt-4 rounded-2xl border p-4 ${tarjetas?.estado === "OK" ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
             <div className="flex items-start justify-between gap-3">
               <div>

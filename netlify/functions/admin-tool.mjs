@@ -113,6 +113,8 @@ export default async (request) => {
           "resumenAsistencia",
           "solicitarControl",
           "operacionPorOficina",
+          "seguimientoPendientes",
+          "guardarSeguimientoPendiente",
         ]),
         zelle: new Set(["datos", "actualizar"]),
       };
@@ -121,7 +123,10 @@ export default async (request) => {
         return json(400, { error: "Acción no permitida." });
       }
 
-      const args = Array.isArray(body.args) ? body.args : [];
+      const args = Array.isArray(body.args) ? [...body.args] : [];
+      if (tool === "consola" && action === "guardarSeguimientoPendiente") {
+        args[5] = email;
+      }
       const cacheKey = `${tool}:${action}:${JSON.stringify(args)}`;
       const ttl = CACHE_TTL[`${tool}:${action}`] || 0;
       const cached = memory.get(cacheKey);

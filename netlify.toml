@@ -34,6 +34,11 @@ to = "/.netlify/functions/admin-drive-health"
 status = 200
 
 [[redirects]]
+from = "/api/admin/cuadre-health"
+to = "/.netlify/functions/admin-cuadre-health"
+status = 200
+
+[[redirects]]
 from = "/api/admin/audit"
 to = "/.netlify/functions/admin-audit"
 status = 200
