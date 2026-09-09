@@ -376,6 +376,14 @@ type CuadreHealthData = {
     casos: number;
   }>;
   resumen: Record<string, number>;
+  cambios?: Array<{
+    detectado: string;
+    fecha: string;
+    oficina: string;
+    motivo: string;
+    antes: number;
+    ahora: number;
+  }>;
   cached?: boolean;
   stale?: boolean;
   pending?: boolean;
@@ -2006,6 +2014,8 @@ type PendingFollowUp = {
   actualizado: string;
   usuario?: string;
   reabierto?: boolean;
+  estado?: "PENDIENTE" | "RESUELTO" | "ESPERANDO_KARLA" | "ESPERANDO_AGENTE" | "DATO_CORRECTO" | "REVISAR_MANANA";
+  revisarDespues?: string;
 };
 
 type PendingFollowUps = Record<string, PendingFollowUp>;
@@ -2569,6 +2579,10 @@ export function PendingCenter({
   const [seguimientos, setSeguimientos] = useState<PendingFollowUps>({});
   const [notaAbierta, setNotaAbierta] = useState("");
   const [diaSeleccionado, setDiaSeleccionado] = useState("");
+  const [filtroDiaCuadre, setFiltroDiaCuadre] = useState("todos");
+  const [filtroOficinaCuadre, setFiltroOficinaCuadre] = useState("todas");
+  const [filtroMotivoCuadre, setFiltroMotivoCuadre] = useState("todos");
+  const [filtroClaseCuadre, setFiltroClaseCuadre] = useState<"todos" | "problema" | "proteccion">("todos");
   const [resumenCopiado, setResumenCopiado] = useState(false);
   const reintentoCuadre = useRef<number | null>(null);
 
@@ -2799,7 +2813,20 @@ export function PendingCenter({
     MAS_QUE_SENTRY: "Lo declarado supera lo respaldado por Sentry",
     RECLAMADO_SIN_COBROS: "Hay un reclamo sin cobros respaldados",
     SIN_DATO_EN_SENTRY: "Falta Daily Report suficiente",
+    TECLEADO_A_MANO: "Valor manual protegido; el bot no lo reemplazó",
   })[motivo] || motivo.replaceAll("_", " ").toLowerCase();
+  const esProteccionCuadre = (motivo: string) => motivo === "TECLEADO_A_MANO";
+  const alertasCuadre = cuadreHealth?.alertas || [];
+  const diasCuadre = [...new Set(alertasCuadre.map((alerta) => alerta.fecha))].sort();
+  const oficinasCuadre = [...new Set(alertasCuadre.map((alerta) => alerta.oficina))].sort();
+  const motivosCuadre = [...new Set(alertasCuadre.map((alerta) => alerta.motivo))].sort();
+  const alertasCuadreVisibles = alertasCuadre.filter((alerta) =>
+    (filtroDiaCuadre === "todos" || alerta.fecha === filtroDiaCuadre) &&
+    (filtroOficinaCuadre === "todas" || alerta.oficina === filtroOficinaCuadre) &&
+    (filtroMotivoCuadre === "todos" || alerta.motivo === filtroMotivoCuadre) &&
+    (filtroClaseCuadre === "todos" ||
+      (filtroClaseCuadre === "proteccion") === esProteccionCuadre(alerta.motivo)),
+  );
   const cierreSeleccionado = cierres.find((dia) => dia.fecha === diaSeleccionado);
   const ultimosSiete = cierres.slice(-7);
   const copiarResumenSemanal = async () => {
@@ -2838,6 +2865,8 @@ export function PendingCenter({
       nota: "",
       responsable: item.responsable,
       actualizado: "",
+      estado: "PENDIENTE" as const,
+      revisarDespues: "",
     };
     const seguimiento = {
       ...actual,
@@ -2858,6 +2887,9 @@ export function PendingCenter({
           seguimiento.revisado,
           seguimiento.nota,
           seguimiento.responsable || item.responsable,
+          undefined,
+          seguimiento.estado || (seguimiento.revisado ? "RESUELTO" : "PENDIENTE"),
+          seguimiento.revisarDespues || "",
         ],
         true,
       ).then((value) => {
@@ -2954,6 +2986,22 @@ export function PendingCenter({
         ))}
       </section>
 
+      <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+        <p className="text-[10px] font-black uppercase tracking-[.12em] text-blue-700">Auditoría de cambios</p>
+        <h3 className="mt-1 text-lg font-black text-slate-950">Variaciones agregadas entre mediciones</h3>
+        <p className="mt-1 text-xs text-slate-500">Detecta si apareció o desapareció una guarda. No conserva nombres, montos ni celdas.</p>
+        <div className="mt-4 divide-y divide-slate-100">
+          {(cuadreHealth?.cambios || []).slice(-8).reverse().map((cambio, indice) => (
+            <div key={`${cambio.detectado}-${cambio.fecha}-${cambio.oficina}-${cambio.motivo}-${indice}`} className="flex flex-wrap items-center gap-2 py-3 text-xs first:pt-0 last:pb-0">
+              <span className="font-black text-slate-900">{fechaHumana(cambio.fecha)} · {cambio.oficina}</span>
+              <span className="min-w-0 flex-1 text-slate-600">{etiquetaGuarda(cambio.motivo)}</span>
+              <span className={`rounded-full px-2.5 py-1 font-black ${cambio.ahora > cambio.antes ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>{cambio.antes} → {cambio.ahora}</span>
+            </div>
+          ))}
+          {!(cuadreHealth?.cambios || []).length && <p className="py-3 text-sm font-semibold text-slate-500">La medición actual es la base; todavía no hay variaciones posteriores.</p>}
+        </div>
+      </section>
+
       <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
           <div>
@@ -3001,23 +3049,30 @@ export function PendingCenter({
                     )}
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        actualizarSeguimiento(item, {
-                          revisado: !seguimientos[item.id]?.revisado,
-                        })
-                      }
-                      className={`rounded-lg px-3 py-1.5 text-[11px] font-black ${
-                        seguimientos[item.id]?.revisado
-                          ? "bg-emerald-100 text-emerald-800"
-                          : "bg-slate-100 text-slate-700"
-                      }`}
-                    >
-                      {seguimientos[item.id]?.revisado
-                        ? "Revisado ✓"
-                        : "Marcar revisado"}
-                    </button>
+                    <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600">
+                      Estado
+                      <select
+                        value={seguimientos[item.id]?.estado || (seguimientos[item.id]?.revisado ? "RESUELTO" : "PENDIENTE")}
+                        onChange={(event) => {
+                          const estado = event.target.value as PendingFollowUp["estado"];
+                          actualizarSeguimiento(item, {
+                            estado,
+                            revisado: estado === "RESUELTO" || estado === "DATO_CORRECTO",
+                            revisarDespues: estado === "REVISAR_MANANA"
+                              ? new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+                              : "",
+                          });
+                        }}
+                        className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-bold text-slate-700"
+                      >
+                        <option value="PENDIENTE">Pendiente</option>
+                        <option value="RESUELTO">Resuelto</option>
+                        <option value="ESPERANDO_KARLA">Esperando a Karla</option>
+                        <option value="ESPERANDO_AGENTE">Esperando al agente</option>
+                        <option value="DATO_CORRECTO">Dato correcto · no cambiar</option>
+                        <option value="REVISAR_MANANA">Revisar mañana</option>
+                      </select>
+                    </label>
                     <button
                       type="button"
                       onClick={() =>
@@ -3047,6 +3102,11 @@ export function PendingCenter({
                   {seguimientos[item.id]?.reabierto && (
                     <p className="mt-2 text-[11px] font-black text-amber-700">
                       Reabierto automáticamente: cambió la evidencia desde la última revisión.
+                    </p>
+                  )}
+                  {seguimientos[item.id]?.estado === "REVISAR_MANANA" && seguimientos[item.id]?.revisarDespues && (
+                    <p className="mt-2 text-[11px] font-black text-violet-700">
+                      Programado para revisar el {fechaHumana(seguimientos[item.id]?.revisarDespues || "")}.
                     </p>
                   )}
                   {notaAbierta === item.id && (
@@ -3156,6 +3216,79 @@ export function PendingCenter({
             </ul>
           </div>
         )}
+      </section>
+
+      <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+        <div className="border-b border-slate-100 px-5 py-4">
+          <p className="text-[10px] font-black uppercase tracking-[.12em] text-blue-700">Detalle del cuadre</p>
+          <h3 className="mt-1 text-lg font-black text-slate-950">Guardas por día, oficina y motivo</h3>
+          <p className="mt-1 text-xs text-slate-500">
+            Las protecciones normales se separan de los problemas reales. Este bloque solo lee conteos agregados.
+          </p>
+        </div>
+        <div className="grid gap-2 border-b border-slate-100 p-4 sm:grid-cols-2 xl:grid-cols-4">
+          <select value={filtroDiaCuadre} onChange={(e) => setFiltroDiaCuadre(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">
+            <option value="todos">Todos los días</option>
+            {diasCuadre.map((dia) => <option key={dia} value={dia}>{fechaHumana(dia)}</option>)}
+          </select>
+          <select value={filtroOficinaCuadre} onChange={(e) => setFiltroOficinaCuadre(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">
+            <option value="todas">Todas las oficinas</option>
+            {oficinasCuadre.map((oficina) => <option key={oficina} value={oficina}>{oficina}</option>)}
+          </select>
+          <select value={filtroMotivoCuadre} onChange={(e) => setFiltroMotivoCuadre(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">
+            <option value="todos">Todos los motivos</option>
+            {motivosCuadre.map((motivo) => <option key={motivo} value={motivo}>{etiquetaGuarda(motivo)}</option>)}
+          </select>
+          <select value={filtroClaseCuadre} onChange={(e) => setFiltroClaseCuadre(e.target.value as typeof filtroClaseCuadre)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">
+            <option value="todos">Problemas y protecciones</option>
+            <option value="problema">Solo problemas reales</option>
+            <option value="proteccion">Solo protecciones normales</option>
+          </select>
+        </div>
+        <div className="divide-y divide-slate-100">
+          {alertasCuadreVisibles.length ? alertasCuadreVisibles.map((alerta) => (
+            <div key={`${alerta.fecha}-${alerta.oficina}-${alerta.motivo}`} className="flex flex-wrap items-center gap-3 px-5 py-3 text-xs">
+              <span className={`rounded-full px-2.5 py-1 font-black ${esProteccionCuadre(alerta.motivo) ? "bg-slate-100 text-slate-700" : "bg-amber-100 text-amber-800"}`}>
+                {esProteccionCuadre(alerta.motivo) ? "Protección" : "Revisar"}
+              </span>
+              <span className="font-black text-slate-900">{fechaHumana(alerta.fecha)} · {alerta.oficina}</span>
+              <span className="min-w-0 flex-1 text-slate-600">{etiquetaGuarda(alerta.motivo)}</span>
+              <span className="font-black tabular-nums text-slate-900">{alerta.casos} {alerta.casos === 1 ? "caso" : "casos"}</span>
+              <button type="button" onClick={() => onNavigate("operacion")} className="rounded-lg bg-slate-900 px-3 py-1.5 font-black text-white hover:bg-blue-700">Abrir Operación</button>
+            </div>
+          )) : (
+            <p className="px-5 py-5 text-sm font-semibold text-emerald-700">No hay guardas que coincidan con estos filtros.</p>
+          )}
+        </div>
+      </section>
+
+      <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[.12em] text-blue-700">Archivos esperados</p>
+            <h3 className="mt-1 text-lg font-black text-slate-950">Responsable, plazo y resultado</h3>
+            <p className="mt-1 text-xs text-slate-500">El estado viene de la ingesta real; “sin confirmar” nunca se cuenta como procesado.</p>
+          </div>
+          {control?.carpetaReportesUrl && <a href={control.carpetaReportesUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-blue-700 px-4 py-2 text-xs font-black text-white"><FolderOpen size={15} /> Abrir carpeta <ExternalLink size={13} /></a>}
+        </div>
+        <div className="divide-y divide-slate-100">
+          {(control?.fuentes || []).map((source) => {
+            const guide = INPUT_GUIDES[source.id];
+            const componente = control?.componentes?.find((item) => item.id === (source.id === "CHASE" ? "recibos_chase" : "sentry"));
+            const rechazado = componente?.estado === "ERROR";
+            const estado = rechazado ? "RECHAZADO" : source.estado === "OK" ? "PROCESADO" : source.estado === "DESACTUALIZADO" ? "ATRASADO" : "SIN CONFIRMAR";
+            const faltan = typeof source.dias === "number" ? Math.max(0, Math.ceil(source.maxDias - source.dias)) : null;
+            return (
+              <div key={source.id} className="grid gap-2 px-5 py-4 text-xs sm:grid-cols-[1.4fr_.7fr_.8fr_auto_auto] sm:items-center">
+                <div><p className="font-black text-slate-900">{guide?.title || source.nombre}</p><p className="mt-0.5 text-slate-500">{guide?.cadence || `Cada ${source.maxDias} días`}</p></div>
+                <p className="font-bold text-slate-700">{guide?.owner || "Oficina"}</p>
+                <p className="text-slate-600">{source.estado === "OK" && faltan !== null ? `vence en ${faltan} día(s)` : source.estado === "DESACTUALIZADO" ? `vencido hace ${Math.max(1, Math.ceil((source.dias || 0) - source.maxDias))} día(s)` : "sin fecha confiable"}</p>
+                <span className={`w-fit rounded-full px-2.5 py-1 text-[10px] font-black ${estado === "PROCESADO" ? "bg-emerald-100 text-emerald-800" : estado === "RECHAZADO" ? "bg-rose-100 text-rose-800" : "bg-amber-100 text-amber-800"}`}>{estado}</span>
+                <button type="button" onClick={() => onNavigate("archivos")} className="w-fit rounded-lg border border-slate-200 bg-white px-3 py-1.5 font-black text-blue-700 hover:border-blue-300 hover:bg-blue-50">Ver archivos</button>
+              </div>
+            );
+          })}
+        </div>
       </section>
 
       <section className="grid gap-5 xl:grid-cols-2">
