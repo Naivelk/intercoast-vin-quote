@@ -234,6 +234,10 @@ type ZelleData = {
   antiguedad?: number;
   ahora?: string;
   pedido?: string | null;
+  desde?: string;
+  hasta?: string;
+  total?: number;
+  truncado?: boolean;
   pagos?: Array<{
     fecha: string;
     hora: string;
@@ -5606,7 +5610,19 @@ export function NativeConsole() {
 }
 
 export function NativeZelle() {
-  const [data, setData] = useState<ZelleData | null>(() => readCache("zelle"));
+  const currentMonth = hoyLosAngeles().slice(0, 7);
+  const [month, setMonth] = useState(() => {
+    const saved = readPreference("zelle-mes");
+    return /^\d{4}-\d{2}$/.test(saved) && saved <= currentMonth
+      ? saved
+      : currentMonth;
+  });
+  const range = useMemo(
+    () => mesEnCurso(new Date(`${month}-15T12:00:00Z`)),
+    [month],
+  );
+  const cacheKey = `zelle-historial:${month}`;
+  const [data, setData] = useState<ZelleData | null>(() => readCache(cacheKey));
   const [query, setQuery] = useState("");
   const [agentFilter, setAgentFilter] = useState(() =>
     readPreference("zelle-agente"),
@@ -5616,7 +5632,6 @@ export function NativeZelle() {
   );
   const [loading, setLoading] = useState(!data);
   const [error, setError] = useState("");
-  const started = useRef(false);
   const load = async (refresh = false) => {
     /* El spinner solo si no hay nada que enseñar, o si lo pidió él. Ver la nota
      * en `loadPart` de la consola: tapar el dato cacheado hacía pagar la espera
@@ -5624,14 +5639,20 @@ export function NativeZelle() {
     if (refresh || !data) setLoading(true);
     setError("");
     try {
+      /* La publicación inmediata conserva el comportamiento anterior para el
+       * mes en curso. Después se lee el historial privado: los agentes siguen
+       * viendo solo tres días y el manager puede auditar el mes completo. */
+      if (refresh && month === currentMonth) {
+        await callTool<ZelleData>("zelle", "actualizar", [], true);
+      }
       const value = await callTool<ZelleData>(
-        "zelle",
-        refresh ? "actualizar" : "datos",
-        [],
+        "consola",
+        "historialZelle",
+        [range.desde, range.hasta, 500],
         refresh,
       );
       setData(value);
-      writeCache("zelle", value);
+      writeCache(cacheKey, value);
     } catch (reason) {
       setError(
         reason instanceof Error
@@ -5643,12 +5664,16 @@ export function NativeZelle() {
     }
   };
   useEffect(() => {
-    if (started.current) return;
-    started.current = true;
+    const cached = readCache<ZelleData>(cacheKey);
+    setData(cached);
+    setLoading(!cached);
+    setDayFilter("Todos");
+    setAgentFilter("Todos");
     void load(false);
-  }, []);
+  }, [cacheKey]);
   useEffect(() => writePreference("zelle-agente", agentFilter), [agentFilter]);
   useEffect(() => writePreference("zelle-dia", dayFilter), [dayFilter]);
+  useEffect(() => writePreference("zelle-mes", month), [month]);
   const allPayments = data?.pagos || [];
   const days = Array.from(new Set(allPayments.map((item) => item.fecha))).sort(
     (a, b) => b.localeCompare(a),
@@ -5717,22 +5742,40 @@ export function NativeZelle() {
               Zelle recibidos
             </h3>
             <p className="mt-1 text-sm text-slate-500">
-              La misma herramienta de los agentes, ahora integrada directamente
-              al panel.
+              Historial privado por mes. La página de los agentes conserva su
+              ventana corta; aquí puedes auditar cualquier día guardado.
             </p>
           </div>
-          <button
-            onClick={() => void load(true)}
-            disabled={loading}
-            className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-4 py-3 text-sm font-black text-white disabled:opacity-60"
-          >
-            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />{" "}
-            Actualizar ahora
-          </button>
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="text-[10px] font-black uppercase tracking-wide text-violet-600">
+              Mes
+              <input
+                type="month"
+                value={month}
+                max={currentMonth}
+                onChange={(event) => setMonth(event.target.value || currentMonth)}
+                className="mt-1 block rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm font-bold text-violet-950"
+              />
+            </label>
+            <button
+              onClick={() => void load(true)}
+              disabled={loading}
+              className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-4 py-3 text-sm font-black text-white disabled:opacity-60"
+            >
+              <RefreshCw size={16} className={loading ? "animate-spin" : ""} />{" "}
+              Actualizar ahora
+            </button>
+          </div>
         </div>
         {error && (
           <p className="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">
             {error}
+          </p>
+        )}
+        {data?.truncado && (
+          <p className="mt-4 rounded-xl bg-amber-50 p-3 text-sm font-semibold text-amber-800">
+            Este mes tiene {data.total} pagos. Se muestran los 500 más recientes;
+            selecciona un día para reducir la vista.
           </p>
         )}
         <div className="mt-6 grid gap-3 sm:grid-cols-3">
