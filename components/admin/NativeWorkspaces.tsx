@@ -984,6 +984,14 @@ const CONTROL_ACTIONS = [
     safe: true,
   },
   {
+    command: "sentry",
+    title: "Procesar Daily Report",
+    description:
+      "Lee los archivos nuevos de Entrada Karla y los archiva al terminar.",
+    date: false,
+    safe: false,
+  },
+  {
     command: "cuadre",
     title: "Cuentas de oficinas",
     description:
@@ -4572,6 +4580,11 @@ export function ManagerFiles() {
             </div>
           </div>
           <div className="flex flex-col gap-2">
+            <a href="https://drive.google.com/drive/folders/1QXsO8q8FSUd68pPtSQkI1ThofWYRGdPo"
+              target="_blank" rel="noreferrer"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-3 text-sm font-black text-white">
+              <FolderOpen size={17} /> Entrada Karla · subir reportes <ExternalLink size={15} />
+            </a>
             <a href="https://drive.google.com/drive/folders/1V8zd8z85B4XlFr9uQqBCzUWEEPXuG6Gq"
               target="_blank" rel="noreferrer"
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-3 text-sm font-black text-white">
