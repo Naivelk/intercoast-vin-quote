@@ -5800,7 +5800,7 @@ export function NativeZelle() {
           />
           <Metric
             label="Total visible"
-            value={money(total)}
+            value={moneyExact(total)}
             hint="Suma de los filtros"
             tone="green"
           />
@@ -5857,7 +5857,7 @@ export function NativeZelle() {
                     {agent}
                   </span>
                   <strong className="mt-1.5 block text-xl tabular-nums">
-                    {money(summary.total)}
+                    {moneyExact(summary.total)}
                   </strong>
                   <span className={`mt-1 block text-xs ${active ? "text-violet-100" : "text-slate-500"}`}>
                     {summary.count} {summary.count === 1 ? "pago" : "pagos"} · Ver detalle
@@ -5944,7 +5944,7 @@ export function NativeZelle() {
                         </div>
                       </div>
                       <strong className="text-lg text-emerald-700">
-                        {money(item.monto)}
+                        {moneyExact(item.monto)}
                       </strong>
                     </div>
                     {item.nota && (
